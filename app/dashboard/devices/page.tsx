@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { AlertCircle, Battery, Eye, Loader2, Plus, Signal, Trash2 } from "lucide-react"
-import { getUserDevices, registerDevice, deleteDevice, getLatestDeviceLog } from "@/lib/field-eyes-api"
+import { getUserDevices, claimDevice, deleteDevice, getLatestDeviceLog } from "@/lib/field-eyes-api"
 import { transformDevices } from "@/lib/transformers"
 import { Device } from "@/types/field-eyes"
 import { useToast } from "@/components/ui/use-toast"
@@ -131,15 +131,15 @@ export default function DevicesPage() {
     try {
       setIsSubmitting(true)
       
-      // Register the device with the Field Eyes API
-      await registerDevice({
-        device_type: "soil_sensor",
-        serial_number: serialNumber
-      })
+      // Claim the existing device with the Field Eyes API
+      const result = await claimDevice(serialNumber)
+      
+      // If device name is provided, update the device list with it
+      const nameToUse = deviceName.trim() || result.serial_number;
       
       toast({
-        title: "Device Added",
-        description: "The device has been successfully registered to your account",
+        title: "Device Claimed",
+        description: "The device has been successfully claimed and added to your account",
       })
       
       // Reset form and close dialog
@@ -152,10 +152,10 @@ export default function DevicesPage() {
       const transformedDevices = transformDevices(rawDevices)
       setDevices(transformedDevices)
     } catch (err) {
-      console.error("Error adding device:", err)
+      console.error("Error claiming device:", err)
       toast({
         title: "Error",
-        description: err instanceof Error ? err.message : "Failed to add device. Please try again.",
+        description: err instanceof Error ? err.message : "Failed to claim device. Please ensure the serial number is correct and the device is not already claimed.",
         variant: "destructive"
       })
     } finally {
@@ -200,23 +200,26 @@ export default function DevicesPage() {
           <DialogTrigger asChild>
             <Button className="bg-green-600 hover:bg-green-700">
               <Plus className="mr-2 h-4 w-4" />
-              Add Device
+              Claim Device
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add New Device</DialogTitle>
-              <DialogDescription>Register a new soil monitoring device to your account.</DialogDescription>
+              <DialogTitle>Claim a Device</DialogTitle>
+              <DialogDescription>Add an existing unclaimed device to your account.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="device-id">Device ID (Serial Number)</Label>
+                <Label htmlFor="device-id">Device Serial Number</Label>
                 <Input 
                   id="device-id" 
-                  placeholder="Enter device serial number" 
+                  placeholder="Enter the device serial number" 
                   value={serialNumber}
                   onChange={(e) => setSerialNumber(e.target.value)}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Enter the serial number printed on your device.
+                </p>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="device-name">Device Name (Optional)</Label>
@@ -227,7 +230,7 @@ export default function DevicesPage() {
                   onChange={(e) => setDeviceName(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  The device name is for your reference only. It will be displayed in the dashboard.
+                  Give your device a friendly name to easily identify it in your dashboard.
                 </p>
               </div>
             </div>
@@ -243,10 +246,10 @@ export default function DevicesPage() {
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Adding...
+                    Claiming...
                   </>
                 ) : (
-                  'Add Device'
+                  'Claim Device'
                 )}
               </Button>
             </DialogFooter>
@@ -280,12 +283,12 @@ export default function DevicesPage() {
         <div className="flex flex-col justify-center items-center h-[200px] text-center">
           <p className="text-lg font-medium mb-2">No devices found</p>
           <p className="text-sm text-muted-foreground mb-4">
-            {searchTerm ? "Try adjusting your search terms" : "Click 'Add Device' to register your first device"}
+            {searchTerm ? "Try adjusting your search terms" : "Click 'Claim Device' to add an existing device to your account"}
           </p>
           {!searchTerm && (
             <Button className="bg-green-600 hover:bg-green-700" onClick={() => setIsAddDeviceOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
-              Add Device
+              Claim Device
             </Button>
           )}
         </div>
