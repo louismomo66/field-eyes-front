@@ -117,10 +117,11 @@ export async function getNotifications(deviceId?: string | number): Promise<Noti
     
   try {
     console.log(`Fetching notifications from: ${endpoint}`);
-    const rawResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:9002/api"}${endpoint}`, {
+    const token = getToken();
+    const rawResponse = await fetch(`${API_URL}${endpoint}`, {
       headers: {
         "Content-Type": "application/json",
-        "Authorization": localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : "",
+        "Authorization": token ? `Bearer ${token}` : "",
       }
     });
     
@@ -181,8 +182,8 @@ export async function clearAllNotifications(): Promise<void> {
     console.log('Clearing all notifications');
     
     // Use the dedicated endpoint to delete all notifications
-    const token = localStorage.getItem('token');
-    const url = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:9002/api"}/notifications/delete-all`;
+    const token = getToken();
+    const url = `${API_URL}/notifications/delete-all`;
     
     console.log(`Deleting all notifications via: ${url}`);
     const response = await fetch(url, {
@@ -220,10 +221,11 @@ export async function getNotificationsBySerialNumber(serialNumber: string): Prom
     const endpoint = `/notifications?device_name=${serialNumber}`;
     console.log(`Fetching notifications using device name endpoint: ${endpoint}`);
     
-    const rawResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:9002/api"}${endpoint}`, {
+    const token = getToken();
+    const rawResponse = await fetch(`${API_URL}${endpoint}`, {
       headers: {
         "Content-Type": "application/json",
-        "Authorization": localStorage.getItem('token') ? `Bearer ${localStorage.getItem('token')}` : "",
+        "Authorization": token ? `Bearer ${token}` : "",
       }
     });
     

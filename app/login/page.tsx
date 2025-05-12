@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Mail, Lock } from "lucide-react"
-import { setToken } from "@/lib/auth"
+import { login } from "@/lib/field-eyes-api"
 
 export default function LoginPage() {
   const [username, setUsername] = useState("")
@@ -23,29 +23,15 @@ export default function LoginPage() {
 
     if (!username || !password) {
       setError("Please enter both email and password")
+      setLoading(false)
       return
     }
 
     try {
-      const response = await fetch("http://localhost:9002/api/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: username,
-          password: password,
-        }),
+      await login({
+        email: username,
+        password: password,
       })
-
-      if (!response.ok) {
-        throw new Error("Invalid credentials")
-      }
-
-      const data = await response.json()
-      
-      // Store token using the auth utility
-      setToken(data.token)
 
       // Small delay to ensure token is stored before redirect
       await new Promise(resolve => setTimeout(resolve, 100))

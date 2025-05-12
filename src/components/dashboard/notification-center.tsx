@@ -8,6 +8,7 @@ import { getNotifications, markNotificationAsRead, generateDeviceNotifications, 
 import type { Notification } from "@/types"
 import { toast } from "@/components/ui/use-toast"
 import React from "react"
+import { getToken } from "@/lib/auth"
 
 interface NotificationCenterProps {
   onNotificationUpdate?: (notifications: Notification[]) => void;
@@ -194,7 +195,7 @@ export function NotificationCenter({
     }
   }
 
-  // Add this debugging function that shows raw API response in a toast
+  // Update the debugFetchNotifications function
   const debugFetchNotifications = async () => {
     try {
       setIsLoading(true);
@@ -213,7 +214,7 @@ export function NotificationCenter({
       console.log(`Debug fetching from: ${endpoint}`);
       
       // Make a direct fetch to see raw response
-      const token = localStorage.getItem('token');
+      const token = getToken();
       const response = await fetch(endpoint, {
         headers: {
           "Authorization": token ? `Bearer ${token}` : "",

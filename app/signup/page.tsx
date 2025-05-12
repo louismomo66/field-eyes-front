@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { User, Mail, Lock } from "lucide-react"
-import { setToken } from "@/lib/auth"
+import { signup } from "@/lib/field-eyes-api"
 
 export default function SignupPage() {
   const [username, setUsername] = useState("")
@@ -48,26 +48,11 @@ export default function SignupPage() {
     }
 
     try {
-      const response = await fetch("http://localhost:9002/api/signup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username,
-          email,
-          password,
-        }),
+      await signup({
+        name: username,
+        email,
+        password,
       })
-
-      if (!response.ok) {
-        throw new Error("Failed to create account")
-      }
-
-      const data = await response.json()
-      
-      // Store token using the auth utility
-      setToken(data.token)
 
       // Small delay to ensure token is stored before redirect
       await new Promise(resolve => setTimeout(resolve, 100))
