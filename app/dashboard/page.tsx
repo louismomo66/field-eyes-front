@@ -156,10 +156,17 @@ export default function DashboardPage() {
 
   // Handle device selection from map
   const handleDeviceSelect = (device: FieldEyesDevice, readings: FieldEyesSoilReading[]) => {
-    setSelectedDevice(device) // device is FieldEyesDevice
-    setSelectedDeviceReadings(readings) // readings are FieldEyesSoilReading[]
-    // calculateDashboardStats expects FieldEyesDevice and FieldEyesSoilReading arrays
-    calculateDashboardStats(allDevices, readings, device)
+    console.log('Dashboard handling device selection:', device.name || device.serial_number);
+    
+    // Set the selected device and readings
+    setSelectedDevice(device);
+    setSelectedDeviceReadings(readings);
+    
+    // Update dashboard stats with the selected device's readings
+    calculateDashboardStats(allDevices, readings, device);
+    
+    // Prevent default behavior that might cause page refresh
+    return false;
   }
 
   // currentDevice and currentReadings are of FieldEyes types
@@ -322,7 +329,7 @@ export default function DashboardPage() {
                 <div className="text-2xl font-bold">{dashboardStats.avgMoisture}%</div>
                 <p className="text-xs text-muted-foreground">
                   {currentDevice 
-                    ? `Weekly average for ${currentDevice.name || currentDevice.serial_number}`
+                    ? `Weekly average for ${currentDevice.name || ""}`
                     : "Weekly average across all devices"} | Optimal: 40-60%
                 </p>
               </CardContent>
@@ -348,7 +355,7 @@ export default function DashboardPage() {
                 <div className="text-2xl font-bold">{dashboardStats.avgPh}</div>
                 <p className="text-xs text-muted-foreground">
                   {currentDevice 
-                    ? `Weekly average for ${currentDevice.name || currentDevice.serial_number}`
+                    ? `Weekly average for ${currentDevice.name || ""}`
                     : "Weekly average across all devices"} | Optimal: 6.0-7.0
                 </p>
               </CardContent>
@@ -399,6 +406,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <SoilHealthIndicator 
+                  key={`health-indicator-${currentDevice?.serial_number || 'default'}`}
                   device={indicatorDevice} 
                   readings={indicatorReadings}
                 />
