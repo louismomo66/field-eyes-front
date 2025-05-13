@@ -14,6 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { preventDefaultNavigation } from "@/lib/prevent-refresh"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -92,6 +93,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       setSelectedDeviceSerial(null)
     }
   }, [pathname])
+
+  // Handle global click events for map
+  useEffect(() => {
+    // Find map containers and popups to prevent refresh behavior
+    const handleClickInsideMap = (e: MouseEvent) => {
+      // Check if click is inside a Leaflet popup or marker
+      const target = e.target as HTMLElement;
+      if (
+        target.closest('.leaflet-popup') || 
+        target.closest('.leaflet-marker-icon') ||
+        target.closest('.map-container')
+      ) {
+        // This is a click inside a map element, prevent navigation
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    };
+    
+    // Add event listener
+    document.addEventListener('click', handleClickInsideMap, true);
+    
+    return () => {
+      document.removeEventListener('click', handleClickInsideMap, true);
+    };
+  }, []);
 
   return (
     <div className="flex min-h-screen bg-gray-50">

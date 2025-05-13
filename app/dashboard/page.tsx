@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Overview } from "@/components/dashboard/overview"
@@ -15,7 +15,35 @@ import { Skeleton } from "@/components/ui/skeleton"
 
 // Dynamically import the Map component with no SSR and loading state
 const DashboardMap = dynamic(
-  () => import('@/components/dashboard/map'),
+  () => import('@/components/dashboard/map').then(mod => {
+    // Modify the component to prevent page refresh
+    const Component = mod.default;
+    return function PreventRefreshMap(props: any) {
+      const mapRef = useRef<HTMLDivElement>(null);
+      
+      // Prevent default behavior on the map container
+      useEffect(() => {
+        if (mapRef.current) {
+          const preventRefresh = (e: Event) => {
+            e.preventDefault();
+            return false;
+          };
+          
+          // Add event listeners to prevent refresh
+          mapRef.current.addEventListener('click', preventRefresh);
+          return () => {
+            mapRef.current?.removeEventListener('click', preventRefresh);
+          };
+        }
+      }, []);
+      
+      return (
+        <div ref={mapRef} className="map-container w-full h-full">
+          <Component {...props} />
+        </div>
+      );
+    };
+  }),
   { 
     ssr: false,
     loading: () => (
@@ -154,20 +182,24 @@ export default function DashboardPage() {
     }
   }, [selectedDevice])
 
-  // Handle device selection from map
-  const handleDeviceSelect = (device: FieldEyesDevice, readings: FieldEyesSoilReading[]) => {
-    console.log('Dashboard handling device selection:', device.name || device.serial_number);
+  // Handle device selection from map - wrap in useCallback to avoid recreating function
+  const handleDeviceSelect = useCallback((device: FieldEyesDevice, readings: FieldEyesSoilReading[]) => {
+    // Log the selection
+    console.log('Dashboard handling device selection:', device.name || '');
     
-    // Set the selected device and readings
-    setSelectedDevice(device);
-    setSelectedDeviceReadings(readings);
+    // Use requestAnimationFrame to ensure React state updates happen outside browser's refresh cycle
+    requestAnimationFrame(() => {
+      // Set the selected device and readings with state updater functions
+      setSelectedDevice(device);
+      setSelectedDeviceReadings(readings);
+      
+      // Update dashboard stats with the selected device's readings
+      calculateDashboardStats(allDevices, readings, device);
+    });
     
-    // Update dashboard stats with the selected device's readings
-    calculateDashboardStats(allDevices, readings, device);
-    
-    // Prevent default behavior that might cause page refresh
+    // Return false to prevent any default behavior
     return false;
-  }
+  }, [allDevices]); // Only depends on allDevices
 
   // currentDevice and currentReadings are of FieldEyes types
   const currentDevice = selectedDevice || defaultDevice

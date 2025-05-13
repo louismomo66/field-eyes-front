@@ -150,8 +150,7 @@ const DashboardMap: React.FC<DashboardMapProps> = ({ onDeviceSelect }) => {
           `);
 
         // Add click handler for device selection
-        marker.on('click', () => {
-          // Get the readings and call onDeviceSelect
+        marker.on('click', function() {
           const readings = deviceReadingsRef.current[location.device.serial_number] || [];
           if (onDeviceSelect) {
             console.log('Selected device:', location.device.name || location.device.serial_number);
