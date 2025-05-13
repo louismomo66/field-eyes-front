@@ -12,7 +12,6 @@ import type { Device as FieldEyesDevice, SoilReading as FieldEyesSoilReading } f
 import type { Device as IndexDevice, SoilReading as IndexSoilReading } from "@/types"
 import dynamic from 'next/dynamic'
 import { Skeleton } from "@/components/ui/skeleton"
-import { NotificationCenter } from "@/components/dashboard/notification-center"
 
 // Dynamically import the Map component with no SSR and loading state
 const DashboardMap = dynamic(
@@ -138,12 +137,12 @@ export default function DashboardPage() {
             allReadingsFlat, 
             selectedDevice || defaultDevice
           )
-          setIsLoading(false)
+        setIsLoading(false)
         }
       } catch (err) {
         console.error("Error fetching dashboard data:", err)
         if (mounted) {
-          setIsLoading(false)
+        setIsLoading(false)
         }
       }
     }
@@ -178,7 +177,7 @@ export default function DashboardPage() {
       // Assuming serial_number is the consistent string identifier for filtering
       ? readings.filter(reading => reading.serial_number === activeDevice.serial_number)
       : readings
-
+    
     const weeklyReadings = relevantReadings.filter(reading => {
       const readingDate = new Date(reading.created_at || '') // FieldEyesSoilReading has created_at
       return readingDate >= oneWeekAgo
@@ -224,12 +223,6 @@ export default function DashboardPage() {
   // currentDevice is FieldEyesDevice | null, currentReadings is FieldEyesSoilReading[]
   const indicatorDevice = transformDeviceForIndicator(currentDevice);
   const indicatorReadings = transformReadingsForIndicator(currentReadings, currentDevice);
-
-  // Add this function somewhere before the return statement, with other state related functions
-  const handleNotificationUpdate = (notifications: any[]) => {
-    // Update any state if needed with the new notifications
-    console.log(`Received ${notifications.length} notifications for device`);
-  }
 
   if (isLoading) {
     return (
@@ -408,27 +401,6 @@ export default function DashboardPage() {
                 <SoilHealthIndicator 
                   device={indicatorDevice} 
                   readings={indicatorReadings}
-                />
-              </CardContent>
-            </Card>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-            <Card className="col-span-4">
-              <CardHeader>
-                <CardTitle>Notification Center</CardTitle>
-                <CardDescription>
-                  {currentDevice 
-                    ? `Notifications for ${currentDevice.name || currentDevice.serial_number}`
-                    : "No device data available"
-                  }
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <NotificationCenter 
-                  deviceId={currentDevice?.id} 
-                  deviceName={currentDevice?.name}
-                  serialNumber={currentDevice?.serial_number} 
-                  onNotificationUpdate={handleNotificationUpdate}
                 />
               </CardContent>
             </Card>

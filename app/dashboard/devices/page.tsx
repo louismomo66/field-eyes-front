@@ -131,11 +131,11 @@ export default function DevicesPage() {
     try {
       setIsSubmitting(true)
       
-      // Claim the existing device with the Field Eyes API
-      const result = await claimDevice(serialNumber)
+      // Get the device name if provided
+      const nameToUse = deviceName.trim() || undefined;
       
-      // If device name is provided, update the device list with it
-      const nameToUse = deviceName.trim() || result.serial_number;
+      // Claim the existing device with the Field Eyes API
+      const result = await claimDevice(serialNumber, nameToUse)
       
       toast({
         title: "Device Claimed",

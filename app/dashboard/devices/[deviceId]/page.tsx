@@ -27,7 +27,7 @@ import {
   LineChart,
   ClipboardList,
 } from "lucide-react"
-import { getLatestDeviceLog, getDeviceLogs } from "@/lib/field-eyes-api"
+import { getLatestDeviceLog, getDeviceLogs, getUserDevices } from "@/lib/field-eyes-api"
 import { transformSoilReading } from "@/lib/transformers"
 import { SoilReading } from "@/types/field-eyes"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -1423,6 +1423,17 @@ export default function DeviceDetailsPage() {
       
       setError(null)
       
+      // Get device details to get the proper name
+      let deviceDetails = null;
+      if (!deviceInfo) {
+        try {
+          const devices = await getUserDevices();
+          deviceDetails = devices.find(d => d.serial_number === deviceId);
+        } catch (err) {
+          console.error("Error fetching device details:", err);
+        }
+      }
+      
       // Fetch the latest reading for this device
       let latestReading;
       let transformedReading;
@@ -1473,7 +1484,7 @@ export default function DeviceDetailsPage() {
       if (!deviceInfo || deviceInfo.status !== status) {
         setDeviceInfo({
           id: deviceId,
-          name: `Field Sensor ${transformedReading.device_id || deviceId}`,
+          name: deviceDetails?.name || `Field Sensor ${transformedReading.device_id || deviceId}`,
           status,
         })
       }

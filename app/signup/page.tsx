@@ -50,8 +50,8 @@ export default function SignupPage() {
     try {
       await signup({
         name: username,
-        email,
-        password,
+          email,
+          password,
       })
 
       // Small delay to ensure token is stored before redirect

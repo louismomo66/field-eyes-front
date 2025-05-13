@@ -61,7 +61,7 @@ export function NotificationCenter({
       
       // Safety check for data structure
       if (data && Array.isArray(data)) {
-        setNotifications(data)
+      setNotifications(data)
         
         // Notify parent component
         if (onNotificationUpdate) {
@@ -294,9 +294,9 @@ export function NotificationCenter({
               </React.Fragment>
             )}
           </Button>
-          <Button variant="ghost" size="sm" className="text-xs" onClick={handleMarkAllAsRead}>
-            Mark all as read
-          </Button>
+        <Button variant="ghost" size="sm" className="text-xs" onClick={handleMarkAllAsRead}>
+          Mark all as read
+        </Button>
         </div>
       </div>
       <ScrollArea className="h-[300px]">

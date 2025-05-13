@@ -168,10 +168,13 @@ import {
     return fetchAPI<Device[]>("/unclaimed-devices")
   }
   
-  export async function claimDevice(serialNumber: string): Promise<{ message: string; device_id: string; serial_number: string }> {
+  export async function claimDevice(serialNumber: string, deviceName?: string): Promise<{ message: string; device_id: string; serial_number: string }> {
     return fetchAPI<{ message: string; device_id: string; serial_number: string }>("/claim-device", {
       method: "POST",
-      body: JSON.stringify({ serial_number: serialNumber }),
+      body: JSON.stringify({ 
+        serial_number: serialNumber,
+        name: deviceName 
+      }),
     })
   }
   

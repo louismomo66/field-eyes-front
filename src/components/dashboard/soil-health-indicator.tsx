@@ -33,9 +33,9 @@ export function SoilHealthIndicator({ device, readings = [] }: SoilHealthIndicat
   })
 
   useEffect(() => {
-    // Calculate health indicators from readings
-    const calculatedHealth = calculateSoilHealth(readings)
-    setHealthData(calculatedHealth)
+        // Calculate health indicators from readings
+        const calculatedHealth = calculateSoilHealth(readings)
+        setHealthData(calculatedHealth)
   }, [readings])
 
   // Calculate soil health from readings

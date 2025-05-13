@@ -29,8 +29,8 @@ export default function LoginPage() {
 
     try {
       await login({
-        email: username,
-        password: password,
+          email: username,
+          password: password,
       })
 
       // Small delay to ensure token is stored before redirect
