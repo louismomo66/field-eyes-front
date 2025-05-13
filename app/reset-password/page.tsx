@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Mail, Lock, Key } from "lucide-react"
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const [email, setEmail] = useState("")
   const [otp, setOtp] = useState("")
   const [newPassword, setNewPassword] = useState("")
@@ -59,7 +59,8 @@ export default function ResetPasswordPage() {
 
     try {
       setLoading(true)
-      const response = await fetch("http://localhost:9002/api/reset-password", {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:9002/api"
+      const response = await fetch(`${API_URL}/reset-password`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -248,5 +249,22 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// Loading fallback for the Suspense boundary
+function ResetPasswordLoading() {
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#62A800]"></div>
+    </div>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<ResetPasswordLoading />}>
+      <ResetPasswordForm />
+    </Suspense>
   )
 } 
