@@ -136,8 +136,11 @@ const FixedMap: React.FC<FixedMapProps> = ({ onDeviceSelect }) => {
       const bounds = L.latLngBounds(deviceLocations.map(loc => [loc.latitude, loc.longitude]));
       
       deviceLocations.forEach(location => {
-        // Create marker with custom popup
-        const marker = L.marker([location.latitude, location.longitude]);
+        // Create marker with custom popup and specific options for clicking
+        const marker = L.marker([location.latitude, location.longitude], {
+          interactive: true, // Ensure marker is interactive
+          bubblingMouseEvents: false // Prevent event bubbling
+        });
         
         // Create popup content
         const popupContent = document.createElement('div');
@@ -148,6 +151,24 @@ const FixedMap: React.FC<FixedMapProps> = ({ onDeviceSelect }) => {
         header.className = 'font-bold';
         header.textContent = location.device.name || location.device.serial_number;
         popupContent.appendChild(header);
+        
+        // Create a direct selection button at the top
+        const quickSelectButton = document.createElement('button');
+        quickSelectButton.textContent = 'Select This Device';
+        quickSelectButton.className = 'w-full my-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs';
+        quickSelectButton.onclick = (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          
+          const readings = deviceReadingsRef.current[location.device.serial_number] || [];
+          if (onDeviceSelect) {
+            onDeviceSelect(location.device, readings);
+          }
+          
+          marker.closePopup();
+          return false;
+        };
+        popupContent.appendChild(quickSelectButton);
         
         // Create readings info
         const readingsDiv = document.createElement('div');
@@ -180,41 +201,21 @@ const FixedMap: React.FC<FixedMapProps> = ({ onDeviceSelect }) => {
         selectButton.textContent = 'View Device Data';
         selectButton.className = 'mt-2 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs';
         selectButton.onclick = (e) => {
-          // Create visual feedback element
-          const debugElement = document.createElement('div');
-          debugElement.style.position = 'fixed';
-          debugElement.style.top = '10px';
-          debugElement.style.right = '10px';
-          debugElement.style.background = 'green';
-          debugElement.style.color = 'white';
-          debugElement.style.padding = '10px';
-          debugElement.style.zIndex = '9999';
-          debugElement.textContent = `Button Clicked: ${location.device.name || location.device.serial_number}`;
-          document.body.appendChild(debugElement);
-          setTimeout(() => document.body.removeChild(debugElement), 3000);
-          
-          console.log('POPUP BUTTON CLICKED');
-          console.log('Device:', location.device.name || location.device.serial_number);
+          // Prevent default behavior
+          e.preventDefault();
+          e.stopPropagation();
           
           // Get the readings
           const readings = deviceReadingsRef.current[location.device.serial_number] || [];
           
-          // Call the onDeviceSelect callback
+          // Call the callback directly
           if (onDeviceSelect) {
-            try {
-              window.alert(`Button clicked for device: ${location.device.name || location.device.serial_number}`);
-              onDeviceSelect(location.device, readings);
-            } catch (err) {
-              console.error('Error in button onDeviceSelect callback:', err);
-            }
+            onDeviceSelect(location.device, readings);
           }
           
           // Close the popup
           marker.closePopup();
           
-          // Prevent default behavior
-          e.preventDefault();
-          e.stopPropagation();
           return false;
         };
         
@@ -223,42 +224,30 @@ const FixedMap: React.FC<FixedMapProps> = ({ onDeviceSelect }) => {
         // Create popup
         const popup = L.popup({
           autoPan: false,
-          closeButton: true
+          closeButton: true,
+          className: 'custom-popup', // Add custom class for styling
         }).setContent(popupContent);
         
         // Bind popup to marker
         marker.bindPopup(popup);
         
-        // Add click handler for immediate device selection - use a simpler approach
+        // Add direct click handler as a simple function
         marker.on('click', function() {
-          // Log directly to document body for debugging (in case console logs are missed)
-          const debugElement = document.createElement('div');
-          debugElement.style.position = 'fixed';
-          debugElement.style.top = '10px';
-          debugElement.style.right = '10px';
-          debugElement.style.background = 'red';
-          debugElement.style.color = 'white';
-          debugElement.style.padding = '10px';
-          debugElement.style.zIndex = '9999';
-          debugElement.textContent = `Clicked: ${location.device.name || location.device.serial_number}`;
-          document.body.appendChild(debugElement);
-          setTimeout(() => document.body.removeChild(debugElement), 3000);
-          
-          console.log('MAP MARKER CLICKED - SIMPLE VERSION');
-          console.log('Device:', location.device.name || location.device.serial_number);
-          
           // Get the readings
           const readings = deviceReadingsRef.current[location.device.serial_number] || [];
           
-          // Call the callback directly
+          // Open the popup first
+          marker.openPopup();
+          
+          // Call the callback directly without any delay or unnecessary event handling
           if (onDeviceSelect) {
-            try {
-              window.alert(`Clicked device: ${location.device.name || location.device.serial_number}`);
-              onDeviceSelect(location.device, readings);
-            } catch (err) {
-              console.error('Error in onDeviceSelect callback:', err);
-            }
+            onDeviceSelect(location.device, readings);
           }
+        });
+        
+        // Add mouseover handler for better UX
+        marker.on('mouseover', function() {
+          marker.openPopup();
         });
         
         // Add the marker to the map

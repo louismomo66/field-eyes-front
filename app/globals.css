@@ -166,6 +166,26 @@ body {
 .leaflet-marker-icon,
 .leaflet-popup {
   cursor: pointer !important;
+  z-index: 1000 !important; /* Ensure markers are above other elements */
+}
+
+/* Ensure markers and popups are clickable */
+.leaflet-marker-icon {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Style custom popups */
+.custom-popup .leaflet-popup-content-wrapper {
+  border-radius: 8px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.custom-popup .leaflet-popup-content {
+  margin: 0;
+  padding: 0;
+  width: 240px !important;
 }
 
 /* Prevent scrolling on map container to avoid page refresh */

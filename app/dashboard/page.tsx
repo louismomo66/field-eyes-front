@@ -98,98 +98,56 @@ export default function DashboardPage() {
     }
   }
   
-  // Calculate dashboard stats - wrap in useCallback for stability
-  const calculateDashboardStats = useCallback((devices: FieldEyesDevice[], readings: FieldEyesSoilReading[], activeDevice: FieldEyesDevice | null) => {
-    console.log('==========================================');
-    console.log('CALCULATING DASHBOARD STATS:');
-    console.log('Active Device:', activeDevice?.name || 'none');
-    console.log('Readings for calculation:', readings.length);
-    console.log('==========================================');
+  // Function to update everything at once
+  const updateAllStates = (device: FieldEyesDevice, readings: FieldEyesSoilReading[]) => {
+    // Update the device and readings
+    setSelectedDevice(device);
+    setSelectedDeviceReadings(readings);
     
-    const totalDevices = devices.length
-    const oneWeekAgo = new Date()
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+    // Update counter to force re-renders
+    setUpdateCounter(prev => prev + 1);
     
-    const relevantReadings = activeDevice
-      ? readings.filter(reading => reading.serial_number === activeDevice.serial_number)
-      : readings
+    // Calculate dashboard stats
+    const totalDevices = allDevices.length;
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
     
-    console.log('Filtered relevant readings:', relevantReadings.length);
+    const relevantReadings = readings.filter(r => r.serial_number === device.serial_number);
+    const weeklyReadings = relevantReadings.filter(r => new Date(r.created_at) >= oneWeekAgo);
     
-    const weeklyReadings = relevantReadings.filter(reading => {
-      const readingDate = new Date(reading.created_at || '')
-      return readingDate >= oneWeekAgo
-    })
+    let totalMoisture = 0, moistureCount = 0, totalPh = 0, phCount = 0;
     
-    console.log('Weekly relevant readings:', weeklyReadings.length);
-
-    let totalMoisture = 0
-    let moistureCount = 0
-    let totalPh = 0
-    let phCount = 0
-
     weeklyReadings.forEach((reading) => {
       if (reading.soil_moisture !== undefined) {
-        totalMoisture += reading.soil_moisture
-        moistureCount++
+        totalMoisture += reading.soil_moisture;
+        moistureCount++;
       }
       if (reading.ph !== undefined) {
-        totalPh += reading.ph
-        phCount++
+        totalPh += reading.ph;
+        phCount++;
       }
-    })
-
-    const avgMoisture = moistureCount > 0 ? Math.round(totalMoisture / moistureCount) : 0
-    const avgPh = phCount > 0 ? Number.parseFloat((totalPh / phCount).toFixed(1)) : 0
-
-    console.log('Calculated values - Moisture:', avgMoisture, '% (from', moistureCount, 'readings)');
-    console.log('Calculated values - pH:', avgPh, '(from', phCount, 'readings)');
-
+    });
+    
+    const avgMoisture = moistureCount > 0 ? Math.round(totalMoisture / moistureCount) : 0;
+    const avgPh = phCount > 0 ? Number.parseFloat((totalPh / phCount).toFixed(1)) : 0;
+    
     const alertCount = weeklyReadings.filter((r) => {
       return (
         (r.ph !== undefined && (r.ph < 5.5 || r.ph > 7.5)) ||
         (r.soil_moisture !== undefined && (r.soil_moisture < 30 || r.soil_moisture > 70)) ||
         (r.soil_temperature !== undefined && (r.soil_temperature < 15 || r.soil_temperature > 30)) ||
         (r.electrical_conductivity !== undefined && (r.electrical_conductivity < 0.5 || r.electrical_conductivity > 1.5))
-      )
-    }).length
+      );
+    }).length;
     
+    // Update dashboard stats
     setDashboardStats({
       totalDevices,
       avgMoisture,
       avgPh,
       alertCount,
-    })
-    
-    console.log('Dashboard stats updated successfully');
-  }, []);
-
-  // Handle device selection from map - wrap in useCallback to avoid recreating function
-  const handleDeviceSelect = useCallback((device: FieldEyesDevice, readings: FieldEyesSoilReading[]) => {
-    console.log('==========================================');
-    console.log('DASHBOARD RECEIVED DEVICE SELECTION:');
-    console.log('Device:', device);
-    console.log('Device Name:', device.name);
-    console.log('Device Serial:', device.serial_number);
-    console.log('Readings received:', readings.length);
-    if (readings.length > 0) {
-      console.log('First reading sample:', readings[0]);
-    }
-    console.log('==========================================');
-    
-    // Update selected device and readings
-    setSelectedDevice(device);
-    setSelectedDeviceReadings(readings);
-    
-    // Force dashboard stats update
-    calculateDashboardStats(allDevices, readings, device);
-    
-    // Increment update counter to force re-render
-    setUpdateCounter(prev => prev + 1);
-    
-    // Return false to prevent any default behavior
-    return false;
-  }, [allDevices, calculateDashboardStats]);
+    });
+  };
 
   useEffect(() => {
     let mounted = true
@@ -223,10 +181,9 @@ export default function DashboardPage() {
         const allReadingsFlat: FieldEyesSoilReading[] = allReadingsArrays.flat();
 
         if (mounted) {
-          calculateDashboardStats(
-            devices, 
-            allReadingsFlat, 
-            selectedDevice || defaultDevice
+          updateAllStates(
+            devices[0], 
+            allReadingsFlat
           )
         setIsLoading(false)
         }
@@ -243,7 +200,7 @@ export default function DashboardPage() {
     return () => {
       mounted = false
     }
-  }, [selectedDevice, calculateDashboardStats])
+  }, [selectedDevice, updateAllStates])
 
   // currentDevice and currentReadings are of FieldEyes types
   const currentDevice = selectedDevice || defaultDevice
@@ -413,27 +370,10 @@ export default function DashboardPage() {
                 <CardDescription>Location of your soil monitoring devices</CardDescription>
           </CardHeader>
               <CardContent className="p-0" style={{ height: '600px', position: 'relative' }}>
-                <button 
-                  onClick={() => window.alert('Map container is working. Try clicking a marker.')}
-                  style={{
-                    position: 'absolute',
-                    top: 10,
-                    left: 10,
-                    zIndex: 1000,
-                    padding: '5px 10px',
-                    background: 'blue',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px'
-                  }}
-                >
-                  Test Click
-                </button>
                 <DashboardMap 
                   onDeviceSelect={(device, readings) => {
                     console.log("Direct inline callback fired!");
-                    window.alert(`Selected: ${device.name || device.serial_number}`);
-                    handleDeviceSelect(device, readings);
+                    updateAllStates(device, readings);
                   }} 
                 />
               </CardContent>
