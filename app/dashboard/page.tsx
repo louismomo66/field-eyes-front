@@ -98,101 +98,63 @@ export default function DashboardPage() {
     }
   }
   
-  // Handle device selection from map
+  // Handle device selection from map - simpler version that updates everything directly
   const handleDeviceSelect = useCallback((device: FieldEyesDevice, readings: FieldEyesSoilReading[]) => {
-    console.log('Dashboard received device selection:', device.name || device.serial_number);
-    console.log('Number of readings:', readings.length);
+    console.log(`Selected device: ${device.name || device.serial_number} with ${readings.length} readings`);
     
-    // Show debug info in DOM
-    const debugElement = document.createElement('div');
-    debugElement.style.position = 'fixed';
-    debugElement.style.top = '50px';
-    debugElement.style.right = '10px';
-    debugElement.style.backgroundColor = 'blue';
-    debugElement.style.color = 'white';
-    debugElement.style.padding = '10px';
-    debugElement.style.borderRadius = '5px';
-    debugElement.style.zIndex = '10000';
-    debugElement.textContent = `Dashboard processing: ${device.name || device.serial_number}`;
-    document.body.appendChild(debugElement);
+    // Create a new copy of the readings to ensure reference changes
+    const readingsCopy = [...readings];
     
-    // Use a more direct approach to update state
-    try {
-      // First, update the state for the device and readings
-      setSelectedDevice((prev) => {
-        console.log('Setting selected device:', device.name);
-        return device;
-      });
-      
-      setSelectedDeviceReadings((prev) => {
-        console.log('Setting selected device readings:', readings.length);
-        return readings;
-      });
-      
-      // Force a re-render with the update counter
-      setUpdateCounter(prevCount => {
-        console.log('Updating counter to force re-render');
-        return prevCount + 1;
-      });
-      
-      // Calculate dashboard stats separately
-      const totalDevices = allDevices.length;
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-      
-      const relevantReadings = readings.filter(r => r.serial_number === device.serial_number);
-      const weeklyReadings = relevantReadings.filter(r => new Date(r.created_at) >= oneWeekAgo);
-      
-      let totalMoisture = 0, moistureCount = 0, totalPh = 0, phCount = 0;
-      
-      weeklyReadings.forEach((reading) => {
-        if (reading.soil_moisture !== undefined) {
-          totalMoisture += reading.soil_moisture;
-          moistureCount++;
-        }
-        if (reading.ph !== undefined) {
-          totalPh += reading.ph;
-          phCount++;
-        }
-      });
-      
-      const avgMoisture = moistureCount > 0 ? Math.round(totalMoisture / moistureCount) : 0;
-      const avgPh = phCount > 0 ? Number.parseFloat((totalPh / phCount).toFixed(1)) : 0;
-      
-      const alertCount = weeklyReadings.filter((r) => {
-        return (
-          (r.ph !== undefined && (r.ph < 5.5 || r.ph > 7.5)) ||
-          (r.soil_moisture !== undefined && (r.soil_moisture < 30 || r.soil_moisture > 70)) ||
-          (r.soil_temperature !== undefined && (r.soil_temperature < 15 || r.soil_temperature > 30)) ||
-          (r.electrical_conductivity !== undefined && (r.electrical_conductivity < 0.5 || r.electrical_conductivity > 1.5))
-        );
-      }).length;
-      
-      // Update dashboard stats directly
-      setDashboardStats({
-        totalDevices,
-        avgMoisture,
-        avgPh,
-        alertCount,
-      });
-      
-      console.log('Dashboard stats updated for device:', device.name);
-      console.log('New values - Moisture:', avgMoisture, '%, pH:', avgPh);
-      
-      // Remove debug element after 3 seconds
-      setTimeout(() => {
-        if (document.body.contains(debugElement)) {
-          document.body.removeChild(debugElement);
-        }
-      }, 3000);
-      
-    } catch (error) {
-      console.error('Error updating state:', error);
-      // Remove debug element if there's an error
-      if (document.body.contains(debugElement)) {
-        document.body.removeChild(debugElement);
+    // Update device and readings state
+    setSelectedDevice({...device});
+    setSelectedDeviceReadings(readingsCopy);
+    
+    // Calculate new stats directly
+    const totalDevices = allDevices.length;
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    
+    // Filter readings for this specific device and within the last week
+    const deviceReadings = readingsCopy.filter(r => r.serial_number === device.serial_number);
+    const weeklyReadings = deviceReadings.filter(r => new Date(r.created_at) >= oneWeekAgo);
+    
+    // Calculate moisture and pH averages
+    let totalMoisture = 0, moistureCount = 0, totalPh = 0, phCount = 0;
+    
+    weeklyReadings.forEach(reading => {
+      if (reading.soil_moisture !== undefined) {
+        totalMoisture += reading.soil_moisture;
+        moistureCount++;
       }
-    }
+      if (reading.ph !== undefined) {
+        totalPh += reading.ph;
+        phCount++;
+      }
+    });
+    
+    const avgMoisture = moistureCount > 0 ? Math.round(totalMoisture / moistureCount) : 0;
+    const avgPh = phCount > 0 ? Number.parseFloat((totalPh / phCount).toFixed(1)) : 0;
+    
+    // Count alerts
+    const alertCount = weeklyReadings.filter(r => 
+      (r.ph !== undefined && (r.ph < 5.5 || r.ph > 7.5)) ||
+      (r.soil_moisture !== undefined && (r.soil_moisture < 30 || r.soil_moisture > 70)) ||
+      (r.soil_temperature !== undefined && (r.soil_temperature < 15 || r.soil_temperature > 30)) ||
+      (r.electrical_conductivity !== undefined && (r.electrical_conductivity < 0.5 || r.electrical_conductivity > 1.5))
+    ).length;
+    
+    // Update dashboard stats
+    setDashboardStats({
+      totalDevices,
+      avgMoisture,
+      avgPh,
+      alertCount,
+    });
+    
+    // Force re-render with update counter
+    setUpdateCounter(prev => prev + 1);
+    
+    console.log(`Dashboard updated with new values - Moisture: ${avgMoisture}%, pH: ${avgPh}`);
   }, [allDevices]);
 
   useEffect(() => {
@@ -467,7 +429,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <SoilHealthIndicator 
-                  key={`indicator-${currentDevice?.serial_number || 'default'}-${updateCounter}-${Date.now()}`}
+                  key={`soil-indicator-${currentDevice?.serial_number}-${updateCounter}-${Math.random()}`}
                   device={indicatorDevice} 
                   readings={indicatorReadings}
                 />

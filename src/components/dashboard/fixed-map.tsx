@@ -280,12 +280,11 @@ const FixedMap: React.FC<FixedMapProps> = ({ onDeviceSelect }) => {
           // Get the readings
           const readings = deviceReadingsRef.current[location.device.serial_number] || [];
           
-          // Open the popup first
-          marker.openPopup();
-          
           // Call the callback directly without any delay or unnecessary event handling
           if (onDeviceSelect) {
+            // Call onDeviceSelect immediately
             onDeviceSelect(location.device, readings);
+            console.log(`Clicked device ${location.device.name || location.device.serial_number} with ${readings.length} readings`);
           }
         });
         
