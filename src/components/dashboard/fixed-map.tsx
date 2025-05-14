@@ -160,9 +160,37 @@ const FixedMap: React.FC<FixedMapProps> = ({ onDeviceSelect }) => {
           e.stopPropagation();
           e.preventDefault();
           
+          // Log selection for debugging
+          console.log('Select button clicked for device:', location.device.name || location.device.serial_number);
+          
           const readings = deviceReadingsRef.current[location.device.serial_number] || [];
           if (onDeviceSelect) {
-            onDeviceSelect(location.device, readings);
+            try {
+              console.log('Calling onDeviceSelect with readings:', readings.length);
+              onDeviceSelect(location.device, readings);
+              
+              // Create visual feedback
+              const notification = document.createElement('div');
+              notification.style.position = 'fixed';
+              notification.style.top = '10px';
+              notification.style.right = '10px';
+              notification.style.background = '#4CAF50';
+              notification.style.color = 'white';
+              notification.style.padding = '10px';
+              notification.style.borderRadius = '4px';
+              notification.style.zIndex = '9999';
+              notification.textContent = `Selected: ${location.device.name || location.device.serial_number}`;
+              document.body.appendChild(notification);
+              
+              // Remove notification after 2 seconds
+              setTimeout(() => {
+                document.body.removeChild(notification);
+              }, 2000);
+            } catch (err) {
+              console.error('Error calling onDeviceSelect:', err);
+            }
+          } else {
+            console.error('No onDeviceSelect callback provided');
           }
           
           marker.closePopup();
@@ -205,12 +233,40 @@ const FixedMap: React.FC<FixedMapProps> = ({ onDeviceSelect }) => {
           e.preventDefault();
           e.stopPropagation();
           
+          // Log selection for debugging
+          console.log('View Device Data button clicked for device:', location.device.name || location.device.serial_number);
+          
           // Get the readings
           const readings = deviceReadingsRef.current[location.device.serial_number] || [];
           
           // Call the callback directly
           if (onDeviceSelect) {
-            onDeviceSelect(location.device, readings);
+            try {
+              console.log('Calling onDeviceSelect with readings:', readings.length);
+              onDeviceSelect(location.device, readings);
+              
+              // Create visual feedback
+              const notification = document.createElement('div');
+              notification.style.position = 'fixed';
+              notification.style.top = '10px';
+              notification.style.right = '10px';
+              notification.style.background = '#4CAF50';
+              notification.style.color = 'white';
+              notification.style.padding = '10px';
+              notification.style.borderRadius = '4px';
+              notification.style.zIndex = '9999';
+              notification.textContent = `Selected: ${location.device.name || location.device.serial_number}`;
+              document.body.appendChild(notification);
+              
+              // Remove notification after 2 seconds
+              setTimeout(() => {
+                document.body.removeChild(notification);
+              }, 2000);
+            } catch (err) {
+              console.error('Error calling onDeviceSelect:', err);
+            }
+          } else {
+            console.error('No onDeviceSelect callback provided');
           }
           
           // Close the popup
@@ -233,16 +289,8 @@ const FixedMap: React.FC<FixedMapProps> = ({ onDeviceSelect }) => {
         
         // Add direct click handler as a simple function
         marker.on('click', function() {
-          // Get the readings
-          const readings = deviceReadingsRef.current[location.device.serial_number] || [];
-          
-          // Open the popup first
+          // Only open the popup on click, don't select the device automatically
           marker.openPopup();
-          
-          // Call the callback directly without any delay or unnecessary event handling
-          if (onDeviceSelect) {
-            onDeviceSelect(location.device, readings);
-          }
         });
         
         // Add mouseover handler for better UX

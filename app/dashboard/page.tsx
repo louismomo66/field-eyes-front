@@ -98,73 +98,67 @@ export default function DashboardPage() {
     }
   }
   
-  // Calculate dashboard stats - wrap in useCallback for stability
-  const calculateDashboardStats = useCallback((devices: FieldEyesDevice[], readings: FieldEyesSoilReading[], activeDevice: FieldEyesDevice | null) => {
-    console.log('Calculating stats for:', activeDevice?.name || 'all devices');
-    
-    const totalDevices = devices.length
-    const oneWeekAgo = new Date()
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
-    
-    const relevantReadings = activeDevice
-      ? readings.filter(reading => reading.serial_number === activeDevice.serial_number)
-      : readings
-    
-    const weeklyReadings = relevantReadings.filter(reading => {
-      const readingDate = new Date(reading.created_at || '')
-      return readingDate >= oneWeekAgo
-    })
-
-    let totalMoisture = 0
-    let moistureCount = 0
-    let totalPh = 0
-    let phCount = 0
-
-    weeklyReadings.forEach((reading) => {
-      if (reading.soil_moisture !== undefined) {
-        totalMoisture += reading.soil_moisture
-        moistureCount++
-      }
-      if (reading.ph !== undefined) {
-        totalPh += reading.ph
-        phCount++
-      }
-    })
-
-    const avgMoisture = moistureCount > 0 ? Math.round(totalMoisture / moistureCount) : 0
-    const avgPh = phCount > 0 ? Number.parseFloat((totalPh / phCount).toFixed(1)) : 0
-
-    const alertCount = weeklyReadings.filter((r) => {
-      return (
-        (r.ph !== undefined && (r.ph < 5.5 || r.ph > 7.5)) ||
-        (r.soil_moisture !== undefined && (r.soil_moisture < 30 || r.soil_moisture > 70)) ||
-        (r.soil_temperature !== undefined && (r.soil_temperature < 15 || r.soil_temperature > 30)) ||
-        (r.electrical_conductivity !== undefined && (r.electrical_conductivity < 0.5 || r.electrical_conductivity > 1.5))
-      )
-    }).length
-
-    setDashboardStats({
-      totalDevices,
-      avgMoisture,
-      avgPh,
-      alertCount,
-    })
-  }, []);
-
   // Handle device selection from map
   const handleDeviceSelect = useCallback((device: FieldEyesDevice, readings: FieldEyesSoilReading[]) => {
-    console.log('Device selected:', device.name || device.serial_number);
+    console.log('Device selected in dashboard:', device.name || device.serial_number);
+    console.log('Readings count:', readings.length);
     
     // Update selected device and readings
-    setSelectedDevice(device);
-    setSelectedDeviceReadings(readings);
+    setSelectedDevice(() => device);
+    setSelectedDeviceReadings(() => readings);
     
-    // Calculate new stats
-    calculateDashboardStats(allDevices, readings, device);
+    // Force an immediate state update for dashboard stats
+    const totalDevices = allDevices.length;
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
     
-    // Force re-render
+    // Filter readings for just this device
+    const deviceReadings = readings.filter(r => r.serial_number === device.serial_number);
+    const weeklyReadings = deviceReadings.filter(r => new Date(r.created_at) >= oneWeekAgo);
+    
+    let totalMoisture = 0, moistureCount = 0, totalPh = 0, phCount = 0;
+    
+    weeklyReadings.forEach(reading => {
+      if (reading.soil_moisture !== undefined) {
+        totalMoisture += reading.soil_moisture;
+        moistureCount++;
+      }
+      if (reading.ph !== undefined) {
+        totalPh += reading.ph;
+        phCount++;
+      }
+    });
+    
+    const avgMoisture = moistureCount > 0 ? Math.round(totalMoisture / moistureCount) : 0;
+    const avgPh = phCount > 0 ? Number.parseFloat((totalPh / phCount).toFixed(1)) : 0;
+    
+    // Count alerts
+    const alertCount = weeklyReadings.filter(r => (
+      (r.ph !== undefined && (r.ph < 5.5 || r.ph > 7.5)) ||
+      (r.soil_moisture !== undefined && (r.soil_moisture < 30 || r.soil_moisture > 70)) ||
+      (r.soil_temperature !== undefined && (r.soil_temperature < 15 || r.soil_temperature > 30)) ||
+      (r.electrical_conductivity !== undefined && (r.electrical_conductivity < 0.5 || r.electrical_conductivity > 1.5))
+    )).length;
+    
+    // Update dashboard stats directly
+    setDashboardStats({
+      totalDevices,
+      avgMoisture, 
+      avgPh,
+      alertCount
+    });
+    
+    // Force re-render of soil health indicator
     setUpdateCounter(prev => prev + 1);
-  }, [allDevices, calculateDashboardStats]);
+    
+    console.log('Dashboard updated with new values:', {
+      device: device.name || device.serial_number,
+      readings: readings.length,
+      avgMoisture,
+      avgPh,
+      alertCount
+    });
+  }, [allDevices]);
 
   useEffect(() => {
     let mounted = true
@@ -187,24 +181,21 @@ export default function DashboardPage() {
           if (mounted) {
             setDefaultDevice(firstDevice)
             setDefaultDeviceReadings(deviceReadings)
+            
+            // If this is initial load and we have a device, use handleDeviceSelect
+            if (!selectedDevice) {
+              handleDeviceSelect(firstDevice, deviceReadings);
+            }
+          }
+        } else if (selectedDevice) {
+          // If we already have a selected device, update its data
+          const deviceReadings = await fetchDeviceReadings(selectedDevice)
+          if (mounted) {
+            handleDeviceSelect(selectedDevice, deviceReadings);
           }
         }
-
-        const oneWeekAgo = new Date()
-        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
-
-        const readingsForStatsPromises = devices.slice(0, 5).map(device => fetchDeviceReadings(device))
-        const allReadingsArrays = await Promise.all(readingsForStatsPromises);
-        const allReadingsFlat = allReadingsArrays.flat();
-
-        if (mounted) {
-          calculateDashboardStats(
-            devices, 
-            allReadingsFlat, 
-            selectedDevice || defaultDevice
-          )
-          setIsLoading(false)
-        }
+        
+        setIsLoading(false)
       } catch (err) {
         console.error("Error fetching dashboard data:", err)
         if (mounted) {
@@ -218,7 +209,7 @@ export default function DashboardPage() {
     return () => {
       mounted = false
     }
-  }, [selectedDevice, calculateDashboardStats])
+  }, [selectedDevice, handleDeviceSelect])
 
   // currentDevice and currentReadings are of FieldEyes types
   const currentDevice = selectedDevice || defaultDevice
