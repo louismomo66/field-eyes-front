@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Overview } from "@/components/dashboard/overview"
@@ -12,38 +12,11 @@ import type { Device as FieldEyesDevice, SoilReading as FieldEyesSoilReading } f
 import type { Device as IndexDevice, SoilReading as IndexSoilReading } from "@/types"
 import dynamic from 'next/dynamic'
 import { Skeleton } from "@/components/ui/skeleton"
+import { NotificationCenter } from "@/components/dashboard/notification-center"
 
 // Dynamically import the Map component with no SSR and loading state
 const DashboardMap = dynamic(
-  () => import('@/components/dashboard/map').then(mod => {
-    // Modify the component to prevent page refresh
-    const Component = mod.default;
-    return function PreventRefreshMap(props: any) {
-      const mapRef = useRef<HTMLDivElement>(null);
-      
-      // Prevent default behavior on the map container
-      useEffect(() => {
-        if (mapRef.current) {
-          const preventRefresh = (e: Event) => {
-            e.preventDefault();
-            return false;
-          };
-          
-          // Add event listeners to prevent refresh
-          mapRef.current.addEventListener('click', preventRefresh);
-          return () => {
-            mapRef.current?.removeEventListener('click', preventRefresh);
-          };
-        }
-      }, []);
-      
-      return (
-        <div ref={mapRef} className="map-container w-full h-full">
-          <Component {...props} />
-        </div>
-      );
-    };
-  }),
+  () => import('@/components/dashboard/map'),
   { 
     ssr: false,
     loading: () => (
@@ -182,24 +155,13 @@ export default function DashboardPage() {
     }
   }, [selectedDevice])
 
-  // Handle device selection from map - wrap in useCallback to avoid recreating function
-  const handleDeviceSelect = useCallback((device: FieldEyesDevice, readings: FieldEyesSoilReading[]) => {
-    // Log the selection
-    console.log('Dashboard handling device selection:', device.name || '');
-    
-    // Use requestAnimationFrame to ensure React state updates happen outside browser's refresh cycle
-    requestAnimationFrame(() => {
-      // Set the selected device and readings with state updater functions
-      setSelectedDevice(device);
-      setSelectedDeviceReadings(readings);
-      
-      // Update dashboard stats with the selected device's readings
-      calculateDashboardStats(allDevices, readings, device);
-    });
-    
-    // Return false to prevent any default behavior
-    return false;
-  }, [allDevices]); // Only depends on allDevices
+  // Handle device selection from map
+  const handleDeviceSelect = (device: FieldEyesDevice, readings: FieldEyesSoilReading[]) => {
+    setSelectedDevice(device) // device is FieldEyesDevice
+    setSelectedDeviceReadings(readings) // readings are FieldEyesSoilReading[]
+    // calculateDashboardStats expects FieldEyesDevice and FieldEyesSoilReading arrays
+    calculateDashboardStats(allDevices, readings, device)
+  }
 
   // currentDevice and currentReadings are of FieldEyes types
   const currentDevice = selectedDevice || defaultDevice
@@ -263,6 +225,12 @@ export default function DashboardPage() {
   const indicatorDevice = transformDeviceForIndicator(currentDevice);
   const indicatorReadings = transformReadingsForIndicator(currentReadings, currentDevice);
 
+  // Add this function somewhere before the return statement, with other state related functions
+  const handleNotificationUpdate = (notifications: any[]) => {
+    // Update any state if needed with the new notifications
+    console.log(`Received ${notifications.length} notifications for device`);
+  }
+
   if (isLoading) {
     return (
       <div className="flex-col md:flex">
@@ -309,126 +277,126 @@ export default function DashboardPage() {
     <>
       <div className="flex-col md:flex">
         <div className="flex-1 space-y-4 p-8 pt-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Devices</CardTitle>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Devices</CardTitle>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
                   className="h-4 w-4 text-primary"
-                >
+            >
                   <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
                   <circle cx="9" cy="7" r="4" />
                   <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
                   <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{dashboardStats.totalDevices}</div>
+            </svg>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{dashboardStats.totalDevices}</div>
                 <p className="text-xs text-muted-foreground">
                   Active monitoring devices
                 </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Average Soil Moisture</CardTitle>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Average Soil Moisture</CardTitle>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
                   className="h-4 w-4 text-blue-500"
-                >
-                  <path d="M16 18a4 4 0 0 0-8 0" />
-                  <path d="M12 2v5" />
-                  <path d="m4.93 10.93 2.83-2.83" />
-                  <path d="M2 18h2" />
-                  <path d="M20 18h2" />
-                  <path d="m19.07 10.93-2.83-2.83" />
-                </svg>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{dashboardStats.avgMoisture}%</div>
+            >
+              <path d="M16 18a4 4 0 0 0-8 0" />
+              <path d="M12 2v5" />
+              <path d="m4.93 10.93 2.83-2.83" />
+              <path d="M2 18h2" />
+              <path d="M20 18h2" />
+              <path d="m19.07 10.93-2.83-2.83" />
+            </svg>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{dashboardStats.avgMoisture}%</div>
                 <p className="text-xs text-muted-foreground">
                   {currentDevice 
-                    ? `Weekly average for ${currentDevice.name || ""}`
+                    ? `Weekly average for ${currentDevice.name || currentDevice.serial_number}`
                     : "Weekly average across all devices"} | Optimal: 40-60%
                 </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Average Soil pH</CardTitle>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Average Soil pH</CardTitle>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
                   className="h-4 w-4 text-purple-500"
-                >
-                  <rect width="20" height="14" x="2" y="5" rx="2" />
-                  <path d="M2 10h20" />
-                </svg>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{dashboardStats.avgPh}</div>
+            >
+              <rect width="20" height="14" x="2" y="5" rx="2" />
+              <path d="M2 10h20" />
+            </svg>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{dashboardStats.avgPh}</div>
                 <p className="text-xs text-muted-foreground">
                   {currentDevice 
-                    ? `Weekly average for ${currentDevice.name || ""}`
+                    ? `Weekly average for ${currentDevice.name || currentDevice.serial_number}`
                     : "Weekly average across all devices"} | Optimal: 6.0-7.0
                 </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Alerts</CardTitle>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Alerts</CardTitle>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
                   className="h-4 w-4 text-destructive"
-                >
-                  <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-                </svg>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{dashboardStats.alertCount}</div>
+            >
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+            </svg>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{dashboardStats.alertCount}</div>
                 <p className="text-xs text-muted-foreground">
                   Active alerts requiring attention
                 </p>
-              </CardContent>
-            </Card>
-          </div>
+          </CardContent>
+        </Card>
+      </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-            <Card className="col-span-4">
-              <CardHeader>
+        <Card className="col-span-4">
+          <CardHeader>
                 <CardTitle>Map</CardTitle>
                 <CardDescription>Location of your soil monitoring devices</CardDescription>
-              </CardHeader>
+          </CardHeader>
               <CardContent className="p-0" style={{ height: '600px', position: 'relative' }}>
                 <DashboardMap onDeviceSelect={handleDeviceSelect} />
-              </CardContent>
-            </Card>
-            <Card className="col-span-3">
-              <CardHeader>
-                <CardTitle>Soil Health</CardTitle>
+          </CardContent>
+        </Card>
+        <Card className="col-span-3">
+          <CardHeader>
+            <CardTitle>Soil Health</CardTitle>
                 <CardDescription>
                   {currentDevice 
                     ? `Soil health indicators for ${currentDevice.name || currentDevice.serial_number}`
@@ -438,15 +406,36 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <SoilHealthIndicator 
-                  key={`health-indicator-${currentDevice?.serial_number || 'default'}`}
+                  key={`health-indicator-${currentDevice?.serial_number || 'default'}-${Date.now()}`}
                   device={indicatorDevice} 
                   readings={indicatorReadings}
                 />
               </CardContent>
             </Card>
           </div>
-        </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+            <Card className="col-span-4">
+              <CardHeader>
+                <CardTitle>Notification Center</CardTitle>
+                <CardDescription>
+                  {currentDevice 
+                    ? `Notifications for ${currentDevice.name || currentDevice.serial_number}`
+                    : "No device data available"
+                  }
+                </CardDescription>
+          </CardHeader>
+          <CardContent>
+                <NotificationCenter 
+                  deviceId={currentDevice?.id} 
+                  deviceName={currentDevice?.name}
+                  serialNumber={currentDevice?.serial_number} 
+                  onNotificationUpdate={handleNotificationUpdate}
+                />
+          </CardContent>
+        </Card>
       </div>
+        </div>
+    </div>
     </>
   )
 }

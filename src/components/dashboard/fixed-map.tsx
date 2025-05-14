@@ -13,11 +13,12 @@ interface DeviceLocation {
   lastReading: SoilReading;
 }
 
-interface DashboardMapProps {
+interface FixedMapProps {
   onDeviceSelect?: (device: Device, readings: SoilReading[]) => void;
 }
 
-const DashboardMap: React.FC<DashboardMapProps> = ({ onDeviceSelect }) => {
+// This is a fixed version of the map component that properly handles device selection
+const FixedMap: React.FC<FixedMapProps> = ({ onDeviceSelect }) => {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<L.Marker[]>([]);
@@ -135,55 +136,93 @@ const DashboardMap: React.FC<DashboardMapProps> = ({ onDeviceSelect }) => {
       const bounds = L.latLngBounds(deviceLocations.map(loc => [loc.latitude, loc.longitude]));
       
       deviceLocations.forEach(location => {
-        // Create marker with custom popup content
+        // Create marker with custom popup
         const marker = L.marker([location.latitude, location.longitude]);
         
         // Create popup content
-        const popupContent = `
-          <div class="p-2">
-            <h3 class="font-bold">${location.device.name || location.device.serial_number}</h3>
-            <div class="text-sm mt-2">
-              <p><strong>Last Reading:</strong></p>
-              <p>Temperature: ${location.lastReading.soil_temperature?.toFixed(1)}°C</p>
-              <p>Moisture: ${location.lastReading.soil_moisture?.toFixed(1)}%</p>
-              <p>pH: ${location.lastReading.ph?.toFixed(1)}</p>
-              <p>Time: ${new Date(location.lastReading.created_at).toLocaleString()}</p>
-            </div>
-          </div>
-        `;
+        const popupContent = document.createElement('div');
+        popupContent.className = 'p-2';
         
-        // Create popup with options to disable auto-panning which can cause refresh issues
-        const popup = L.popup({
-          autoPan: false,
-          closeButton: true,
-        }).setContent(popupContent);
+        // Create device name header
+        const header = document.createElement('h3');
+        header.className = 'font-bold';
+        header.textContent = location.device.name || location.device.serial_number;
+        popupContent.appendChild(header);
         
-        // Bind popup to marker with custom options
-        marker.bindPopup(popup);
+        // Create readings info
+        const readingsDiv = document.createElement('div');
+        readingsDiv.className = 'text-sm mt-2';
         
-        // Add click handler for device selection with explicit event prevention
-        marker.on('click', function(e) {
-          // Stop event propagation
-          L.DomEvent.stopPropagation(e);
+        // Add reading fields
+        const fields = [
+          { label: 'Temperature', value: `${location.lastReading.soil_temperature?.toFixed(1)}°C` },
+          { label: 'Moisture', value: `${location.lastReading.soil_moisture?.toFixed(1)}%` },
+          { label: 'pH', value: location.lastReading.ph?.toFixed(1) },
+          { label: 'Time', value: new Date(location.lastReading.created_at).toLocaleString() }
+        ];
+        
+        // Add title
+        const title = document.createElement('p');
+        title.innerHTML = '<strong>Last Reading:</strong>';
+        readingsDiv.appendChild(title);
+        
+        // Add each field
+        fields.forEach(field => {
+          const p = document.createElement('p');
+          p.textContent = `${field.label}: ${field.value}`;
+          readingsDiv.appendChild(p);
+        });
+        
+        popupContent.appendChild(readingsDiv);
+        
+        // Add a select device button
+        const selectButton = document.createElement('button');
+        selectButton.textContent = 'View Device Data';
+        selectButton.className = 'mt-2 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs';
+        selectButton.onclick = (e) => {
+          // Explicitly stop event propagation
+          e.stopPropagation();
+          e.preventDefault();
           
-          // Prevent any default browser behavior
-          if (e.originalEvent) {
-            e.originalEvent.preventDefault();
-            e.originalEvent.stopPropagation();
+          // Get the readings
+          const readings = deviceReadingsRef.current[location.device.serial_number] || [];
+          
+          // Call the onDeviceSelect callback
+          if (onDeviceSelect) {
+            onDeviceSelect(location.device, readings);
           }
           
-          // Get the readings and call onDeviceSelect
+          // Close the popup
+          marker.closePopup();
+          
+          // Return false to prevent any navigation
+          return false;
+        };
+        
+        popupContent.appendChild(selectButton);
+        
+        // Create popup
+        const popup = L.popup({
+          autoPan: false,
+          closeButton: true
+        }).setContent(popupContent);
+        
+        // Bind popup to marker
+        marker.bindPopup(popup);
+        
+        // Add click handler for immediate device selection
+        marker.on('click', () => {
+          // Get the readings
           const readings = deviceReadingsRef.current[location.device.serial_number] || [];
+          
+          // Call the callback
           if (onDeviceSelect) {
             console.log('Selected device:', location.device.name || location.device.serial_number);
             onDeviceSelect(location.device, readings);
           }
-          
-          // Return false to prevent any further event propagation
-          return false;
         });
         
-        // Add to map and store in markers ref
+        // Add the marker to the map
         marker.addTo(mapRef.current!);
         markersRef.current.push(marker);
       });
@@ -256,9 +295,9 @@ const DashboardMap: React.FC<DashboardMapProps> = ({ onDeviceSelect }) => {
   return (
     <div 
       ref={mapContainerRef}
-      className="w-full h-[600px] rounded-lg overflow-hidden border border-gray-200 relative z-0"
+      className="w-full h-[600px] rounded-lg overflow-hidden border border-gray-200 relative z-0 map-container"
     />
   );
 };
 
-export default DashboardMap; 
+export default FixedMap; 
