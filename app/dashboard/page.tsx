@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Overview } from "@/components/dashboard/overview"
@@ -12,11 +12,10 @@ import type { Device as FieldEyesDevice, SoilReading as FieldEyesSoilReading } f
 import type { Device as IndexDevice, SoilReading as IndexSoilReading } from "@/types"
 import dynamic from 'next/dynamic'
 import { Skeleton } from "@/components/ui/skeleton"
-import { NotificationCenter } from "@/components/dashboard/notification-center"
 
-// Dynamically import the Map component with no SSR and loading state
+// Dynamically import the FixedMap component with no SSR
 const DashboardMap = dynamic(
-  () => import('@/components/dashboard/map'),
+  () => import('@/components/dashboard/fixed-map'),
   { 
     ssr: false,
     loading: () => (
@@ -49,7 +48,7 @@ const transformReadingsForIndicator = (
   readings: FieldEyesSoilReading[],
   sourceDevice: FieldEyesDevice | null
 ): IndexSoilReading[] => {
-  return readings.map(reading => { // reading is FieldEyesSoilReading
+  return readings.map(reading => {
     const deviceNameStr = sourceDevice?.name || sourceDevice?.serial_number || reading.serial_number;
     let calculatedStatus: IndexSoilReading['status'] = "optimal";
     if (reading.soil_moisture !== undefined) {
@@ -58,17 +57,17 @@ const transformReadingsForIndicator = (
     }
     const transformedReading: IndexSoilReading = {
       id: String(reading.id || `${reading.serial_number}-${reading.created_at}`),
-      deviceId: reading.serial_number, // required by IndexSoilReading
-      deviceName: deviceNameStr, // required by IndexSoilReading
+      deviceId: reading.serial_number,
+      deviceName: deviceNameStr,
       timestamp: reading.created_at,
       moisture: reading.soil_moisture,
       temperature: reading.soil_temperature,
       ph: reading.ph,
       nitrogen: reading.nitrogen,
-      phosphorus: reading.phosphorous, // from field-eyes, maps to IndexSoilReading.phosphorus
+      phosphorus: reading.phosphorous,
       potassium: reading.potassium,
       ec: reading.electrical_conductivity,
-      status: calculatedStatus, // required by IndexSoilReading
+      status: calculatedStatus,
     };
     return transformedReading;
   });
@@ -91,14 +90,82 @@ export default function DashboardPage() {
   const fetchDeviceReadings = async (device: FieldEyesDevice): Promise<FieldEyesSoilReading[]> => {
     try {
       const readings = await getDeviceLogs(device.serial_number);
-      // Ensure the mapping here results in FieldEyesSoilReading[] if further transformation is done
-      // For now, assume getDeviceLogs returns FieldEyesSoilReading[] or compatible
-      return readings ? readings.map(r => ({...r})) : []; // Basic map to ensure it's a new array, adjust if needed
+      return readings ? readings.map(r => ({...r})) : [];
     } catch (err) {
       console.error(`Error fetching logs for device ${device.serial_number}:`, err)
       return []
     }
   }
+  
+  // Calculate dashboard stats - wrap in useCallback for stability
+  const calculateDashboardStats = useCallback((devices: FieldEyesDevice[], readings: FieldEyesSoilReading[], activeDevice: FieldEyesDevice | null) => {
+    console.log('Calculating dashboard stats for device:', activeDevice?.name || 'none');
+    
+    const totalDevices = devices.length
+    const oneWeekAgo = new Date()
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+    
+    const relevantReadings = activeDevice
+      ? readings.filter(reading => reading.serial_number === activeDevice.serial_number)
+      : readings
+    
+    const weeklyReadings = relevantReadings.filter(reading => {
+      const readingDate = new Date(reading.created_at || '')
+      return readingDate >= oneWeekAgo
+    })
+
+    let totalMoisture = 0
+    let moistureCount = 0
+    let totalPh = 0
+    let phCount = 0
+
+    weeklyReadings.forEach((reading) => {
+      if (reading.soil_moisture !== undefined) {
+        totalMoisture += reading.soil_moisture
+        moistureCount++
+      }
+      if (reading.ph !== undefined) {
+        totalPh += reading.ph
+        phCount++
+      }
+    })
+
+    const avgMoisture = moistureCount > 0 ? Math.round(totalMoisture / moistureCount) : 0
+    const avgPh = phCount > 0 ? Number.parseFloat((totalPh / phCount).toFixed(1)) : 0
+
+    const alertCount = weeklyReadings.filter((r) => {
+      return (
+        (r.ph !== undefined && (r.ph < 5.5 || r.ph > 7.5)) ||
+        (r.soil_moisture !== undefined && (r.soil_moisture < 30 || r.soil_moisture > 70)) ||
+        (r.soil_temperature !== undefined && (r.soil_temperature < 15 || r.soil_temperature > 30)) ||
+        (r.electrical_conductivity !== undefined && (r.electrical_conductivity < 0.5 || r.electrical_conductivity > 1.5))
+      )
+    }).length
+
+    console.log(`Stats calculated: Moisture: ${avgMoisture}%, pH: ${avgPh}`);
+    
+    setDashboardStats({
+      totalDevices,
+      avgMoisture,
+      avgPh,
+      alertCount,
+    })
+  }, []);
+
+  // Handle device selection from map - wrap in useCallback to avoid recreating function
+  const handleDeviceSelect = useCallback((device: FieldEyesDevice, readings: FieldEyesSoilReading[]) => {
+    console.log('Dashboard handling device selection:', device.name || device.serial_number);
+    
+    // Explicitly update all dependent state synchronously
+    setSelectedDevice(device);
+    setSelectedDeviceReadings(readings);
+    
+    // Calculate dashboard stats with the new device and readings
+    calculateDashboardStats(allDevices, readings, device);
+    
+    // Return false to prevent any default behavior
+    return false;
+  }, [allDevices, calculateDashboardStats]);
 
   useEffect(() => {
     let mounted = true
@@ -107,7 +174,7 @@ export default function DashboardPage() {
       try {
         setIsLoading(true)
         
-        const devices: FieldEyesDevice[] = await getUserDevices() // Assuming getUserDevices returns FieldEyesDevice[]
+        const devices: FieldEyesDevice[] = await getUserDevices()
         if (!mounted || !devices || devices.length === 0) {
           setIsLoading(false)
           return
@@ -120,14 +187,13 @@ export default function DashboardPage() {
           
           if (mounted) {
             setDefaultDevice(firstDevice)
-            setDefaultDeviceReadings(deviceReadings) // deviceReadings is FieldEyesSoilReading[]
+            setDefaultDeviceReadings(deviceReadings)
           }
         }
 
         const oneWeekAgo = new Date()
         oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
 
-        // Assuming this part is for dashboard stats and uses FieldEyes types
         const readingsForStatsPromises = devices.slice(0, 5).map(device => fetchDeviceReadings(device))
         const allReadingsArrays = await Promise.all(readingsForStatsPromises);
         const allReadingsFlat: FieldEyesSoilReading[] = allReadingsArrays.flat();
@@ -153,83 +219,15 @@ export default function DashboardPage() {
     return () => {
       mounted = false
     }
-  }, [selectedDevice])
-
-  // Handle device selection from map
-  const handleDeviceSelect = (device: FieldEyesDevice, readings: FieldEyesSoilReading[]) => {
-    setSelectedDevice(device) // device is FieldEyesDevice
-    setSelectedDeviceReadings(readings) // readings are FieldEyesSoilReading[]
-    // calculateDashboardStats expects FieldEyesDevice and FieldEyesSoilReading arrays
-    calculateDashboardStats(allDevices, readings, device)
-  }
+  }, [selectedDevice, calculateDashboardStats])
 
   // currentDevice and currentReadings are of FieldEyes types
   const currentDevice = selectedDevice || defaultDevice
   const currentReadings = selectedDeviceReadings.length > 0 ? selectedDeviceReadings : defaultDeviceReadings
 
-  // calculateDashboardStats works with FieldEyes types
-  const calculateDashboardStats = (devices: FieldEyesDevice[], readings: FieldEyesSoilReading[], activeDevice: FieldEyesDevice | null) => {
-    const totalDevices = devices.length
-    const oneWeekAgo = new Date()
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
-    
-    const relevantReadings = activeDevice
-      // Ensure comparison is type-safe: activeDevice.id (number) vs reading.device_id (string on FieldEyesSoilReading? Check type)
-      // Assuming serial_number is the consistent string identifier for filtering
-      ? readings.filter(reading => reading.serial_number === activeDevice.serial_number)
-      : readings
-    
-    const weeklyReadings = relevantReadings.filter(reading => {
-      const readingDate = new Date(reading.created_at || '') // FieldEyesSoilReading has created_at
-      return readingDate >= oneWeekAgo
-    })
-
-    let totalMoisture = 0
-    let moistureCount = 0
-    let totalPh = 0
-    let phCount = 0
-
-    weeklyReadings.forEach((reading) => { // reading is FieldEyesSoilReading
-      if (reading.soil_moisture !== undefined) {
-        totalMoisture += reading.soil_moisture
-        moistureCount++
-      }
-      if (reading.ph !== undefined) {
-        totalPh += reading.ph
-        phCount++
-      }
-    })
-
-    const avgMoisture = moistureCount > 0 ? Math.round(totalMoisture / moistureCount) : 0
-    const avgPh = phCount > 0 ? Number.parseFloat((totalPh / phCount).toFixed(1)) : 0
-
-    const alertCount = weeklyReadings.filter((r) => { // r is FieldEyesSoilReading
-      return (
-        (r.ph !== undefined && (r.ph < 5.5 || r.ph > 7.5)) ||
-        (r.soil_moisture !== undefined && (r.soil_moisture < 30 || r.soil_moisture > 70)) ||
-        (r.soil_temperature !== undefined && (r.soil_temperature < 15 || r.soil_temperature > 30)) ||
-        (r.electrical_conductivity !== undefined && (r.electrical_conductivity < 0.5 || r.electrical_conductivity > 1.5))
-      )
-    }).length
-
-    setDashboardStats({
-      totalDevices,
-      avgMoisture,
-      avgPh,
-      alertCount,
-    })
-  }
-
   // Prepare props for SoilHealthIndicator using adapters
-  // currentDevice is FieldEyesDevice | null, currentReadings is FieldEyesSoilReading[]
   const indicatorDevice = transformDeviceForIndicator(currentDevice);
   const indicatorReadings = transformReadingsForIndicator(currentReadings, currentDevice);
-
-  // Add this function somewhere before the return statement, with other state related functions
-  const handleNotificationUpdate = (notifications: any[]) => {
-    // Update any state if needed with the new notifications
-    console.log(`Received ${notifications.length} notifications for device`);
-  }
 
   if (isLoading) {
     return (
@@ -329,7 +327,7 @@ export default function DashboardPage() {
             <div className="text-2xl font-bold">{dashboardStats.avgMoisture}%</div>
                 <p className="text-xs text-muted-foreground">
                   {currentDevice 
-                    ? `Weekly average for ${currentDevice.name || currentDevice.serial_number}`
+                    ? `Weekly average for ${currentDevice.name || ""}`
                     : "Weekly average across all devices"} | Optimal: 40-60%
                 </p>
           </CardContent>
@@ -355,7 +353,7 @@ export default function DashboardPage() {
             <div className="text-2xl font-bold">{dashboardStats.avgPh}</div>
                 <p className="text-xs text-muted-foreground">
                   {currentDevice 
-                    ? `Weekly average for ${currentDevice.name || currentDevice.serial_number}`
+                    ? `Weekly average for ${currentDevice.name || ""}`
                     : "Weekly average across all devices"} | Optimal: 6.0-7.0
                 </p>
           </CardContent>
@@ -413,29 +411,8 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-            <Card className="col-span-4">
-              <CardHeader>
-                <CardTitle>Notification Center</CardTitle>
-                <CardDescription>
-                  {currentDevice 
-                    ? `Notifications for ${currentDevice.name || currentDevice.serial_number}`
-                    : "No device data available"
-                  }
-                </CardDescription>
-          </CardHeader>
-          <CardContent>
-                <NotificationCenter 
-                  deviceId={currentDevice?.id} 
-                  deviceName={currentDevice?.name}
-                  serialNumber={currentDevice?.serial_number} 
-                  onNotificationUpdate={handleNotificationUpdate}
-                />
-          </CardContent>
-        </Card>
-      </div>
         </div>
-    </div>
+      </div>
     </>
   )
 }
