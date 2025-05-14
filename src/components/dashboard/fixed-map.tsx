@@ -180,22 +180,41 @@ const FixedMap: React.FC<FixedMapProps> = ({ onDeviceSelect }) => {
         selectButton.textContent = 'View Device Data';
         selectButton.className = 'mt-2 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs';
         selectButton.onclick = (e) => {
-          // Explicitly stop event propagation
-          e.stopPropagation();
-          e.preventDefault();
+          // Create visual feedback element
+          const debugElement = document.createElement('div');
+          debugElement.style.position = 'fixed';
+          debugElement.style.top = '10px';
+          debugElement.style.right = '10px';
+          debugElement.style.background = 'green';
+          debugElement.style.color = 'white';
+          debugElement.style.padding = '10px';
+          debugElement.style.zIndex = '9999';
+          debugElement.textContent = `Button Clicked: ${location.device.name || location.device.serial_number}`;
+          document.body.appendChild(debugElement);
+          setTimeout(() => document.body.removeChild(debugElement), 3000);
+          
+          console.log('POPUP BUTTON CLICKED');
+          console.log('Device:', location.device.name || location.device.serial_number);
           
           // Get the readings
           const readings = deviceReadingsRef.current[location.device.serial_number] || [];
           
           // Call the onDeviceSelect callback
           if (onDeviceSelect) {
-            onDeviceSelect(location.device, readings);
+            try {
+              window.alert(`Button clicked for device: ${location.device.name || location.device.serial_number}`);
+              onDeviceSelect(location.device, readings);
+            } catch (err) {
+              console.error('Error in button onDeviceSelect callback:', err);
+            }
           }
           
           // Close the popup
           marker.closePopup();
           
-          // Return false to prevent any navigation
+          // Prevent default behavior
+          e.preventDefault();
+          e.stopPropagation();
           return false;
         };
         
@@ -210,40 +229,36 @@ const FixedMap: React.FC<FixedMapProps> = ({ onDeviceSelect }) => {
         // Bind popup to marker
         marker.bindPopup(popup);
         
-        // Add click handler for immediate device selection
-        marker.on('click', function(e) {
-          // Log the click event
-          console.log('==========================================');
-          console.log('MAP MARKER CLICKED:');
-          console.log('Device:', location.device);
-          console.log('Device Name:', location.device.name);
-          console.log('Device Serial:', location.device.serial_number);
-          console.log('Has readings:', deviceReadingsRef.current[location.device.serial_number]?.length || 0);
-          console.log('==========================================');
+        // Add click handler for immediate device selection - use a simpler approach
+        marker.on('click', function() {
+          // Log directly to document body for debugging (in case console logs are missed)
+          const debugElement = document.createElement('div');
+          debugElement.style.position = 'fixed';
+          debugElement.style.top = '10px';
+          debugElement.style.right = '10px';
+          debugElement.style.background = 'red';
+          debugElement.style.color = 'white';
+          debugElement.style.padding = '10px';
+          debugElement.style.zIndex = '9999';
+          debugElement.textContent = `Clicked: ${location.device.name || location.device.serial_number}`;
+          document.body.appendChild(debugElement);
+          setTimeout(() => document.body.removeChild(debugElement), 3000);
           
-          // Stop event propagation
-          L.DomEvent.stopPropagation(e);
-          
-          // Prevent any default browser behavior
-          if (e.originalEvent) {
-            e.originalEvent.preventDefault();
-            e.originalEvent.stopPropagation();
-          }
+          console.log('MAP MARKER CLICKED - SIMPLE VERSION');
+          console.log('Device:', location.device.name || location.device.serial_number);
           
           // Get the readings
           const readings = deviceReadingsRef.current[location.device.serial_number] || [];
           
-          // Call the callback with a short timeout to ensure it runs after event handling
+          // Call the callback directly
           if (onDeviceSelect) {
-            console.log('Calling onDeviceSelect callback...');
-            onDeviceSelect(location.device, readings);
-            console.log('onDeviceSelect callback called');
-          } else {
-            console.error('No onDeviceSelect callback provided!');
+            try {
+              window.alert(`Clicked device: ${location.device.name || location.device.serial_number}`);
+              onDeviceSelect(location.device, readings);
+            } catch (err) {
+              console.error('Error in onDeviceSelect callback:', err);
+            }
           }
-          
-          // Return false to prevent any further event propagation
-          return false;
         });
         
         // Add the marker to the map

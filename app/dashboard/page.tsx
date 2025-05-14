@@ -86,6 +86,7 @@ export default function DashboardPage() {
   const [selectedDeviceReadings, setSelectedDeviceReadings] = useState<FieldEyesSoilReading[]>([])
   const [defaultDevice, setDefaultDevice] = useState<FieldEyesDevice | null>(null)
   const [defaultDeviceReadings, setDefaultDeviceReadings] = useState<FieldEyesSoilReading[]>([])
+  const [updateCounter, setUpdateCounter] = useState(0)
 
   const fetchDeviceReadings = async (device: FieldEyesDevice): Promise<FieldEyesSoilReading[]> => {
     try {
@@ -182,6 +183,9 @@ export default function DashboardPage() {
     
     // Force dashboard stats update
     calculateDashboardStats(allDevices, readings, device);
+    
+    // Increment update counter to force re-render
+    setUpdateCounter(prev => prev + 1);
     
     // Return false to prevent any default behavior
     return false;
@@ -409,8 +413,30 @@ export default function DashboardPage() {
                 <CardDescription>Location of your soil monitoring devices</CardDescription>
           </CardHeader>
               <CardContent className="p-0" style={{ height: '600px', position: 'relative' }}>
-                <DashboardMap onDeviceSelect={handleDeviceSelect} />
-          </CardContent>
+                <button 
+                  onClick={() => window.alert('Map container is working. Try clicking a marker.')}
+                  style={{
+                    position: 'absolute',
+                    top: 10,
+                    left: 10,
+                    zIndex: 1000,
+                    padding: '5px 10px',
+                    background: 'blue',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px'
+                  }}
+                >
+                  Test Click
+                </button>
+                <DashboardMap 
+                  onDeviceSelect={(device, readings) => {
+                    console.log("Direct inline callback fired!");
+                    window.alert(`Selected: ${device.name || device.serial_number}`);
+                    handleDeviceSelect(device, readings);
+                  }} 
+                />
+              </CardContent>
         </Card>
         <Card className="col-span-3">
           <CardHeader>
@@ -424,7 +450,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <SoilHealthIndicator 
-                  key={`health-${currentDevice?.serial_number || 'default'}-${Date.now()}`}
+                  key={`health-${currentDevice?.serial_number || 'default'}-${updateCounter}`}
                   device={indicatorDevice} 
                   readings={indicatorReadings}
                 />
