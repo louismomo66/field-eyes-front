@@ -98,56 +98,73 @@ export default function DashboardPage() {
     }
   }
   
-  // Function to update everything at once
-  const updateAllStates = (device: FieldEyesDevice, readings: FieldEyesSoilReading[]) => {
-    // Update the device and readings
-    setSelectedDevice(device);
-    setSelectedDeviceReadings(readings);
+  // Calculate dashboard stats - wrap in useCallback for stability
+  const calculateDashboardStats = useCallback((devices: FieldEyesDevice[], readings: FieldEyesSoilReading[], activeDevice: FieldEyesDevice | null) => {
+    console.log('Calculating stats for:', activeDevice?.name || 'all devices');
     
-    // Update counter to force re-renders
-    setUpdateCounter(prev => prev + 1);
+    const totalDevices = devices.length
+    const oneWeekAgo = new Date()
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
     
-    // Calculate dashboard stats
-    const totalDevices = allDevices.length;
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    const relevantReadings = activeDevice
+      ? readings.filter(reading => reading.serial_number === activeDevice.serial_number)
+      : readings
     
-    const relevantReadings = readings.filter(r => r.serial_number === device.serial_number);
-    const weeklyReadings = relevantReadings.filter(r => new Date(r.created_at) >= oneWeekAgo);
-    
-    let totalMoisture = 0, moistureCount = 0, totalPh = 0, phCount = 0;
-    
+    const weeklyReadings = relevantReadings.filter(reading => {
+      const readingDate = new Date(reading.created_at || '')
+      return readingDate >= oneWeekAgo
+    })
+
+    let totalMoisture = 0
+    let moistureCount = 0
+    let totalPh = 0
+    let phCount = 0
+
     weeklyReadings.forEach((reading) => {
       if (reading.soil_moisture !== undefined) {
-        totalMoisture += reading.soil_moisture;
-        moistureCount++;
+        totalMoisture += reading.soil_moisture
+        moistureCount++
       }
       if (reading.ph !== undefined) {
-        totalPh += reading.ph;
-        phCount++;
+        totalPh += reading.ph
+        phCount++
       }
-    });
-    
-    const avgMoisture = moistureCount > 0 ? Math.round(totalMoisture / moistureCount) : 0;
-    const avgPh = phCount > 0 ? Number.parseFloat((totalPh / phCount).toFixed(1)) : 0;
-    
+    })
+
+    const avgMoisture = moistureCount > 0 ? Math.round(totalMoisture / moistureCount) : 0
+    const avgPh = phCount > 0 ? Number.parseFloat((totalPh / phCount).toFixed(1)) : 0
+
     const alertCount = weeklyReadings.filter((r) => {
       return (
         (r.ph !== undefined && (r.ph < 5.5 || r.ph > 7.5)) ||
         (r.soil_moisture !== undefined && (r.soil_moisture < 30 || r.soil_moisture > 70)) ||
         (r.soil_temperature !== undefined && (r.soil_temperature < 15 || r.soil_temperature > 30)) ||
         (r.electrical_conductivity !== undefined && (r.electrical_conductivity < 0.5 || r.electrical_conductivity > 1.5))
-      );
-    }).length;
-    
-    // Update dashboard stats
+      )
+    }).length
+
     setDashboardStats({
       totalDevices,
       avgMoisture,
       avgPh,
       alertCount,
-    });
-  };
+    })
+  }, []);
+
+  // Handle device selection from map
+  const handleDeviceSelect = useCallback((device: FieldEyesDevice, readings: FieldEyesSoilReading[]) => {
+    console.log('Device selected:', device.name || device.serial_number);
+    
+    // Update selected device and readings
+    setSelectedDevice(device);
+    setSelectedDeviceReadings(readings);
+    
+    // Calculate new stats
+    calculateDashboardStats(allDevices, readings, device);
+    
+    // Force re-render
+    setUpdateCounter(prev => prev + 1);
+  }, [allDevices, calculateDashboardStats]);
 
   useEffect(() => {
     let mounted = true
@@ -156,7 +173,7 @@ export default function DashboardPage() {
       try {
         setIsLoading(true)
         
-        const devices: FieldEyesDevice[] = await getUserDevices()
+        const devices = await getUserDevices()
         if (!mounted || !devices || devices.length === 0) {
           setIsLoading(false)
           return
@@ -178,19 +195,20 @@ export default function DashboardPage() {
 
         const readingsForStatsPromises = devices.slice(0, 5).map(device => fetchDeviceReadings(device))
         const allReadingsArrays = await Promise.all(readingsForStatsPromises);
-        const allReadingsFlat: FieldEyesSoilReading[] = allReadingsArrays.flat();
+        const allReadingsFlat = allReadingsArrays.flat();
 
         if (mounted) {
-          updateAllStates(
-            devices[0], 
-            allReadingsFlat
+          calculateDashboardStats(
+            devices, 
+            allReadingsFlat, 
+            selectedDevice || defaultDevice
           )
-        setIsLoading(false)
+          setIsLoading(false)
         }
       } catch (err) {
         console.error("Error fetching dashboard data:", err)
         if (mounted) {
-        setIsLoading(false)
+          setIsLoading(false)
         }
       }
     }
@@ -200,7 +218,7 @@ export default function DashboardPage() {
     return () => {
       mounted = false
     }
-  }, [selectedDevice, updateAllStates])
+  }, [selectedDevice, calculateDashboardStats])
 
   // currentDevice and currentReadings are of FieldEyes types
   const currentDevice = selectedDevice || defaultDevice
@@ -256,131 +274,128 @@ export default function DashboardPage() {
     <>
       <div className="flex-col md:flex">
         <div className="flex-1 space-y-4 p-8 pt-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Devices</CardTitle>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Devices</CardTitle>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
                   className="h-4 w-4 text-primary"
-            >
+                >
                   <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
                   <circle cx="9" cy="7" r="4" />
                   <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
                   <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{dashboardStats.totalDevices}</div>
+                </svg>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{dashboardStats.totalDevices}</div>
                 <p className="text-xs text-muted-foreground">
                   Active monitoring devices
                 </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Soil Moisture</CardTitle>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Average Soil Moisture</CardTitle>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
                   className="h-4 w-4 text-blue-500"
-            >
-              <path d="M16 18a4 4 0 0 0-8 0" />
-              <path d="M12 2v5" />
-              <path d="m4.93 10.93 2.83-2.83" />
-              <path d="M2 18h2" />
-              <path d="M20 18h2" />
-              <path d="m19.07 10.93-2.83-2.83" />
-            </svg>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{dashboardStats.avgMoisture}%</div>
+                >
+                  <path d="M16 18a4 4 0 0 0-8 0" />
+                  <path d="M12 2v5" />
+                  <path d="m4.93 10.93 2.83-2.83" />
+                  <path d="M2 18h2" />
+                  <path d="M20 18h2" />
+                  <path d="m19.07 10.93-2.83-2.83" />
+                </svg>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{dashboardStats.avgMoisture}%</div>
                 <p className="text-xs text-muted-foreground">
                   {currentDevice 
                     ? `Weekly average for ${currentDevice.name || "Selected Device"}`
                     : "Weekly average across all devices"} | Optimal: 40-60%
                 </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Soil pH</CardTitle>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Average Soil pH</CardTitle>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
                   className="h-4 w-4 text-purple-500"
-            >
-              <rect width="20" height="14" x="2" y="5" rx="2" />
-              <path d="M2 10h20" />
-            </svg>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{dashboardStats.avgPh}</div>
+                >
+                  <rect width="20" height="14" x="2" y="5" rx="2" />
+                  <path d="M2 10h20" />
+                </svg>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{dashboardStats.avgPh}</div>
                 <p className="text-xs text-muted-foreground">
                   {currentDevice 
                     ? `Weekly average for ${currentDevice.name || "Selected Device"}`
                     : "Weekly average across all devices"} | Optimal: 6.0-7.0
                 </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Alerts</CardTitle>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Alerts</CardTitle>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
                   className="h-4 w-4 text-destructive"
-            >
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-            </svg>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{dashboardStats.alertCount}</div>
+                >
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                </svg>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{dashboardStats.alertCount}</div>
                 <p className="text-xs text-muted-foreground">
                   Active alerts requiring attention
                 </p>
-          </CardContent>
-        </Card>
-      </div>
+              </CardContent>
+            </Card>
+          </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
-          <CardHeader>
+            <Card className="col-span-4">
+              <CardHeader>
                 <CardTitle>Map</CardTitle>
                 <CardDescription>Location of your soil monitoring devices</CardDescription>
-          </CardHeader>
+              </CardHeader>
               <CardContent className="p-0" style={{ height: '600px', position: 'relative' }}>
                 <DashboardMap 
-                  onDeviceSelect={(device, readings) => {
-                    console.log("Direct inline callback fired!");
-                    updateAllStates(device, readings);
-                  }} 
+                  onDeviceSelect={handleDeviceSelect} 
                 />
               </CardContent>
-        </Card>
-        <Card className="col-span-3">
-          <CardHeader>
-            <CardTitle>Soil Health</CardTitle>
+            </Card>
+            <Card className="col-span-3">
+              <CardHeader>
+                <CardTitle>Soil Health</CardTitle>
                 <CardDescription>
                   {currentDevice 
                     ? `Soil health indicators for ${currentDevice.name || currentDevice.serial_number}`
