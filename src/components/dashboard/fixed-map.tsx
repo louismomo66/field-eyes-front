@@ -160,35 +160,30 @@ const FixedMap: React.FC<FixedMapProps> = ({ onDeviceSelect }) => {
           e.stopPropagation();
           e.preventDefault();
           
-          // Log selection for debugging
-          console.log('Select button clicked for device:', location.device.name || location.device.serial_number);
+          console.log('Quick select button clicked for device:', location.device.name || location.device.serial_number);
           
+          // Get readings with fallback to empty array
           const readings = deviceReadingsRef.current[location.device.serial_number] || [];
+          console.log('Found readings for selected device:', readings.length);
+          
           if (onDeviceSelect) {
-            try {
-              console.log('Calling onDeviceSelect with readings:', readings.length);
-              onDeviceSelect(location.device, readings);
-              
-              // Create visual feedback
-              const notification = document.createElement('div');
-              notification.style.position = 'fixed';
-              notification.style.top = '10px';
-              notification.style.right = '10px';
-              notification.style.background = '#4CAF50';
-              notification.style.color = 'white';
-              notification.style.padding = '10px';
-              notification.style.borderRadius = '4px';
-              notification.style.zIndex = '9999';
-              notification.textContent = `Selected: ${location.device.name || location.device.serial_number}`;
-              document.body.appendChild(notification);
-              
-              // Remove notification after 2 seconds
-              setTimeout(() => {
-                document.body.removeChild(notification);
-              }, 2000);
-            } catch (err) {
-              console.error('Error calling onDeviceSelect:', err);
-            }
+            // Create a visible indicator showing the selection is working
+            const indicator = document.createElement('div');
+            indicator.style.position = 'fixed';
+            indicator.style.top = '10px';
+            indicator.style.right = '10px';
+            indicator.style.backgroundColor = 'green';
+            indicator.style.color = 'white';
+            indicator.style.padding = '10px';
+            indicator.style.borderRadius = '5px';
+            indicator.style.zIndex = '10000';
+            indicator.textContent = `Selected: ${location.device.name || location.device.serial_number}`;
+            document.body.appendChild(indicator);
+            setTimeout(() => document.body.removeChild(indicator), 2000);
+            
+            // Call the callback directly - no wrapping or setTimeout
+            onDeviceSelect(location.device, readings);
+            console.log('Called onDeviceSelect with device and readings');
           } else {
             console.error('No onDeviceSelect callback provided');
           }
@@ -224,7 +219,7 @@ const FixedMap: React.FC<FixedMapProps> = ({ onDeviceSelect }) => {
         
         popupContent.appendChild(readingsDiv);
         
-        // Add a select device button
+        // Add a select device button at the bottom
         const selectButton = document.createElement('button');
         selectButton.textContent = 'View Device Data';
         selectButton.className = 'mt-2 px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs';
@@ -233,38 +228,31 @@ const FixedMap: React.FC<FixedMapProps> = ({ onDeviceSelect }) => {
           e.preventDefault();
           e.stopPropagation();
           
-          // Log selection for debugging
           console.log('View Device Data button clicked for device:', location.device.name || location.device.serial_number);
           
           // Get the readings
           const readings = deviceReadingsRef.current[location.device.serial_number] || [];
+          console.log('Found readings for selected device:', readings.length);
           
           // Call the callback directly
           if (onDeviceSelect) {
-            try {
-              console.log('Calling onDeviceSelect with readings:', readings.length);
-              onDeviceSelect(location.device, readings);
-              
-              // Create visual feedback
-              const notification = document.createElement('div');
-              notification.style.position = 'fixed';
-              notification.style.top = '10px';
-              notification.style.right = '10px';
-              notification.style.background = '#4CAF50';
-              notification.style.color = 'white';
-              notification.style.padding = '10px';
-              notification.style.borderRadius = '4px';
-              notification.style.zIndex = '9999';
-              notification.textContent = `Selected: ${location.device.name || location.device.serial_number}`;
-              document.body.appendChild(notification);
-              
-              // Remove notification after 2 seconds
-              setTimeout(() => {
-                document.body.removeChild(notification);
-              }, 2000);
-            } catch (err) {
-              console.error('Error calling onDeviceSelect:', err);
-            }
+            // Create a visible indicator showing the selection is working
+            const indicator = document.createElement('div');
+            indicator.style.position = 'fixed';
+            indicator.style.top = '10px';
+            indicator.style.right = '10px';
+            indicator.style.backgroundColor = 'green';
+            indicator.style.color = 'white';
+            indicator.style.padding = '10px';
+            indicator.style.borderRadius = '5px';
+            indicator.style.zIndex = '10000';
+            indicator.textContent = `Selected: ${location.device.name || location.device.serial_number}`;
+            document.body.appendChild(indicator);
+            setTimeout(() => document.body.removeChild(indicator), 2000);
+            
+            // Call the callback directly - no wrapping or setTimeout
+            onDeviceSelect(location.device, readings);
+            console.log('Called onDeviceSelect with device and readings');
           } else {
             console.error('No onDeviceSelect callback provided');
           }
@@ -289,8 +277,16 @@ const FixedMap: React.FC<FixedMapProps> = ({ onDeviceSelect }) => {
         
         // Add direct click handler as a simple function
         marker.on('click', function() {
-          // Only open the popup on click, don't select the device automatically
+          // Get the readings
+          const readings = deviceReadingsRef.current[location.device.serial_number] || [];
+          
+          // Open the popup first
           marker.openPopup();
+          
+          // Call the callback directly without any delay or unnecessary event handling
+          if (onDeviceSelect) {
+            onDeviceSelect(location.device, readings);
+          }
         });
         
         // Add mouseover handler for better UX
