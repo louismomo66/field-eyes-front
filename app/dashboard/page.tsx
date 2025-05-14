@@ -154,14 +154,19 @@ export default function DashboardPage() {
 
   // Handle device selection from map - wrap in useCallback to avoid recreating function
   const handleDeviceSelect = useCallback((device: FieldEyesDevice, readings: FieldEyesSoilReading[]) => {
-    console.log('Dashboard handling device selection:', device.name || device.serial_number);
+    console.log('Dashboard handling device selection:', device.name || device.serial_number, 'with', readings.length, 'readings');
     
-    // Explicitly update all dependent state synchronously
-    setSelectedDevice(device);
-    setSelectedDeviceReadings(readings);
-    
-    // Calculate dashboard stats with the new device and readings
-    calculateDashboardStats(allDevices, readings, device);
+    // Force state updates to happen in the correct order with timeout
+    setTimeout(() => {
+      // Update selected device and readings
+      setSelectedDevice(device);
+      setSelectedDeviceReadings(readings);
+      
+      // Force dashboard stats update
+      calculateDashboardStats(allDevices, readings, device);
+      
+      console.log('States updated for device:', device.name || device.serial_number);
+    }, 0);
     
     // Return false to prevent any default behavior
     return false;
@@ -327,7 +332,7 @@ export default function DashboardPage() {
             <div className="text-2xl font-bold">{dashboardStats.avgMoisture}%</div>
                 <p className="text-xs text-muted-foreground">
                   {currentDevice 
-                    ? `Weekly average for ${currentDevice.name || ""}`
+                    ? `Weekly average for ${currentDevice.name || "Selected Device"}`
                     : "Weekly average across all devices"} | Optimal: 40-60%
                 </p>
           </CardContent>
@@ -353,7 +358,7 @@ export default function DashboardPage() {
             <div className="text-2xl font-bold">{dashboardStats.avgPh}</div>
                 <p className="text-xs text-muted-foreground">
                   {currentDevice 
-                    ? `Weekly average for ${currentDevice.name || ""}`
+                    ? `Weekly average for ${currentDevice.name || "Selected Device"}`
                     : "Weekly average across all devices"} | Optimal: 6.0-7.0
                 </p>
           </CardContent>
@@ -404,7 +409,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <SoilHealthIndicator 
-                  key={`health-indicator-${currentDevice?.serial_number || 'default'}-${Date.now()}`}
+                  key={`health-${currentDevice?.serial_number || 'default'}-${Date.now()}`}
                   device={indicatorDevice} 
                   readings={indicatorReadings}
                 />

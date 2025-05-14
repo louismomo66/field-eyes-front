@@ -33,13 +33,33 @@ export function SoilHealthIndicator({ device, readings = [] }: SoilHealthIndicat
   })
 
   useEffect(() => {
-        // Log when the component receives new readings
-        console.log('SoilHealthIndicator received readings for device:', device?.id || 'none', 'with', readings.length, 'readings');
-        
-        // Calculate health indicators from readings
-        const calculatedHealth = calculateSoilHealth(readings)
-        setHealthData(calculatedHealth)
-  }, [readings, device])
+    // Log when the component receives new readings
+    console.log('SoilHealthIndicator received readings for device:', device?.id || 'none', 'with', readings.length, 'readings');
+    
+    // Reset health data if device changes to ensure clean re-render
+    setHealthData({
+      overall: 0,
+      moisture: 0,
+      temperature: 0,
+      ph: 0,
+      nitrogen: 0,
+      phosphorus: 0,
+      potassium: 0,
+      ec: 0,
+      organicMatter: 0,
+    });
+    
+    // Calculate health indicators from readings after a small delay
+    setTimeout(() => {
+      const calculatedHealth = calculateSoilHealth(readings);
+      setHealthData(calculatedHealth);
+      console.log('Health data updated with scores:', 
+        `Overall: ${calculatedHealth.overall}, ` +
+        `Moisture: ${calculatedHealth.moisture}, ` +
+        `pH: ${calculatedHealth.ph}`
+      );
+    }, 50);
+  }, [readings, device?.id])
 
   // Calculate soil health from readings
   const calculateSoilHealth = (readings: SoilReading[]) => {

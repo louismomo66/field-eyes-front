@@ -211,15 +211,29 @@ const FixedMap: React.FC<FixedMapProps> = ({ onDeviceSelect }) => {
         marker.bindPopup(popup);
         
         // Add click handler for immediate device selection
-        marker.on('click', () => {
+        marker.on('click', function(e) {
+          // Stop event propagation
+          L.DomEvent.stopPropagation(e);
+          
+          // Prevent any default browser behavior
+          if (e.originalEvent) {
+            e.originalEvent.preventDefault();
+            e.originalEvent.stopPropagation();
+          }
+          
           // Get the readings
           const readings = deviceReadingsRef.current[location.device.serial_number] || [];
           
-          // Call the callback
+          // Call the callback with a short timeout to ensure it runs after event handling
           if (onDeviceSelect) {
-            console.log('Selected device:', location.device.name || location.device.serial_number);
-            onDeviceSelect(location.device, readings);
+            console.log('Map marker clicked for device:', location.device.name || location.device.serial_number);
+            setTimeout(() => {
+              onDeviceSelect(location.device, readings);
+            }, 10);
           }
+          
+          // Return false to prevent any further event propagation
+          return false;
         });
         
         // Add the marker to the map
