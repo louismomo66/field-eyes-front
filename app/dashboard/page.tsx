@@ -99,7 +99,11 @@ export default function DashboardPage() {
   
   // Calculate dashboard stats - wrap in useCallback for stability
   const calculateDashboardStats = useCallback((devices: FieldEyesDevice[], readings: FieldEyesSoilReading[], activeDevice: FieldEyesDevice | null) => {
-    console.log('Calculating dashboard stats for device:', activeDevice?.name || 'none');
+    console.log('==========================================');
+    console.log('CALCULATING DASHBOARD STATS:');
+    console.log('Active Device:', activeDevice?.name || 'none');
+    console.log('Readings for calculation:', readings.length);
+    console.log('==========================================');
     
     const totalDevices = devices.length
     const oneWeekAgo = new Date()
@@ -109,10 +113,14 @@ export default function DashboardPage() {
       ? readings.filter(reading => reading.serial_number === activeDevice.serial_number)
       : readings
     
+    console.log('Filtered relevant readings:', relevantReadings.length);
+    
     const weeklyReadings = relevantReadings.filter(reading => {
       const readingDate = new Date(reading.created_at || '')
       return readingDate >= oneWeekAgo
     })
+    
+    console.log('Weekly relevant readings:', weeklyReadings.length);
 
     let totalMoisture = 0
     let moistureCount = 0
@@ -133,6 +141,9 @@ export default function DashboardPage() {
     const avgMoisture = moistureCount > 0 ? Math.round(totalMoisture / moistureCount) : 0
     const avgPh = phCount > 0 ? Number.parseFloat((totalPh / phCount).toFixed(1)) : 0
 
+    console.log('Calculated values - Moisture:', avgMoisture, '% (from', moistureCount, 'readings)');
+    console.log('Calculated values - pH:', avgPh, '(from', phCount, 'readings)');
+
     const alertCount = weeklyReadings.filter((r) => {
       return (
         (r.ph !== undefined && (r.ph < 5.5 || r.ph > 7.5)) ||
@@ -141,8 +152,6 @@ export default function DashboardPage() {
         (r.electrical_conductivity !== undefined && (r.electrical_conductivity < 0.5 || r.electrical_conductivity > 1.5))
       )
     }).length
-
-    console.log(`Stats calculated: Moisture: ${avgMoisture}%, pH: ${avgPh}`);
     
     setDashboardStats({
       totalDevices,
@@ -150,23 +159,29 @@ export default function DashboardPage() {
       avgPh,
       alertCount,
     })
+    
+    console.log('Dashboard stats updated successfully');
   }, []);
 
   // Handle device selection from map - wrap in useCallback to avoid recreating function
   const handleDeviceSelect = useCallback((device: FieldEyesDevice, readings: FieldEyesSoilReading[]) => {
-    console.log('Dashboard handling device selection:', device.name || device.serial_number, 'with', readings.length, 'readings');
+    console.log('==========================================');
+    console.log('DASHBOARD RECEIVED DEVICE SELECTION:');
+    console.log('Device:', device);
+    console.log('Device Name:', device.name);
+    console.log('Device Serial:', device.serial_number);
+    console.log('Readings received:', readings.length);
+    if (readings.length > 0) {
+      console.log('First reading sample:', readings[0]);
+    }
+    console.log('==========================================');
     
-    // Force state updates to happen in the correct order with timeout
-    setTimeout(() => {
-      // Update selected device and readings
-      setSelectedDevice(device);
-      setSelectedDeviceReadings(readings);
-      
-      // Force dashboard stats update
-      calculateDashboardStats(allDevices, readings, device);
-      
-      console.log('States updated for device:', device.name || device.serial_number);
-    }, 0);
+    // Update selected device and readings
+    setSelectedDevice(device);
+    setSelectedDeviceReadings(readings);
+    
+    // Force dashboard stats update
+    calculateDashboardStats(allDevices, readings, device);
     
     // Return false to prevent any default behavior
     return false;

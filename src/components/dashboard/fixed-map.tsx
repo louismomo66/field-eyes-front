@@ -212,6 +212,15 @@ const FixedMap: React.FC<FixedMapProps> = ({ onDeviceSelect }) => {
         
         // Add click handler for immediate device selection
         marker.on('click', function(e) {
+          // Log the click event
+          console.log('==========================================');
+          console.log('MAP MARKER CLICKED:');
+          console.log('Device:', location.device);
+          console.log('Device Name:', location.device.name);
+          console.log('Device Serial:', location.device.serial_number);
+          console.log('Has readings:', deviceReadingsRef.current[location.device.serial_number]?.length || 0);
+          console.log('==========================================');
+          
           // Stop event propagation
           L.DomEvent.stopPropagation(e);
           
@@ -226,10 +235,11 @@ const FixedMap: React.FC<FixedMapProps> = ({ onDeviceSelect }) => {
           
           // Call the callback with a short timeout to ensure it runs after event handling
           if (onDeviceSelect) {
-            console.log('Map marker clicked for device:', location.device.name || location.device.serial_number);
-            setTimeout(() => {
-              onDeviceSelect(location.device, readings);
-            }, 10);
+            console.log('Calling onDeviceSelect callback...');
+            onDeviceSelect(location.device, readings);
+            console.log('onDeviceSelect callback called');
+          } else {
+            console.error('No onDeviceSelect callback provided!');
           }
           
           // Return false to prevent any further event propagation
