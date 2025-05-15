@@ -161,6 +161,7 @@ const FixedMap: React.FC<FixedMapProps> = ({ onDeviceSelect }) => {
           e.preventDefault();
           
           console.log('Quick select button clicked for device:', location.device.name || location.device.serial_number);
+          console.log('Device details:', JSON.stringify(location.device, null, 2));
           
           // Get readings with fallback to empty array
           const readings = deviceReadingsRef.current[location.device.serial_number] || [];
@@ -229,6 +230,7 @@ const FixedMap: React.FC<FixedMapProps> = ({ onDeviceSelect }) => {
           e.stopPropagation();
           
           console.log('View Device Data button clicked for device:', location.device.name || location.device.serial_number);
+          console.log('Device details:', JSON.stringify(location.device, null, 2));
           
           // Get the readings
           const readings = deviceReadingsRef.current[location.device.serial_number] || [];
@@ -279,7 +281,11 @@ const FixedMap: React.FC<FixedMapProps> = ({ onDeviceSelect }) => {
         marker.on('click', function() {
           // Get the readings
           const readings = deviceReadingsRef.current[location.device.serial_number] || [];
-          
+           
+          // Log device details
+          console.log('Marker clicked directly for device:', location.device.name || location.device.serial_number);
+          console.log('Device details:', JSON.stringify(location.device, null, 2));
+           
           // Call the callback directly without any delay or unnecessary event handling
           if (onDeviceSelect) {
             // Call onDeviceSelect immediately

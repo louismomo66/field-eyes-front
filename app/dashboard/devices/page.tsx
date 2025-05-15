@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { AlertCircle, Battery, Eye, Loader2, Plus, Signal, Trash2 } from "lucide-react"
-import { getUserDevices, claimDevice, deleteDevice, getLatestDeviceLog } from "@/lib/field-eyes-api"
+import { getUserDevices, claimDevice, deleteDevice, getLatestDeviceLog, registerDevice, APIError } from "@/lib/field-eyes-api"
 import { transformDevices } from "@/lib/transformers"
 import { Device } from "@/types/field-eyes"
 import { useToast } from "@/components/ui/use-toast"
@@ -59,7 +59,7 @@ export default function DevicesPage() {
               // Return device with enhanced information
               return {
                 ...device,
-                name: `Field Sensor ${device.id}`, // Use a better name if available
+                name: device.name || `Field Sensor ${device.id}`, // Use provided name if available, fall back to default
                 status,
                 battery: Math.floor(Math.random() * 100), // Simulate battery level
                 signal: status === "offline" ? "No Signal" : "Strong",
@@ -69,7 +69,7 @@ export default function DevicesPage() {
               // If we can't get the latest reading, mark as inactive
               return {
                 ...device,
-                name: `Field Sensor ${device.id}`,
+                name: device.name || `Field Sensor ${device.id}`, // Use provided name if available, fall back to default
                 status: "offline" as const,
                 battery: 0,
                 signal: "No Signal",
@@ -115,7 +115,34 @@ export default function DevicesPage() {
     !searchTerm || 
     (device.name && device.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
     device.serial_number.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  ).map(device => {
+    // Special handling for specific device with serial number 9565985947890
+    if (device.serial_number === "9565985947890") {
+      // Use window.localStorage to store and retrieve the custom name
+      const storedName = typeof window !== 'undefined' ? window.localStorage.getItem('custom_name_9565985947890') : null;
+      
+      if (storedName) {
+        console.log(`Using stored custom name for device 9565985947890: "${storedName}"`);
+        return { ...device, name: storedName };
+      } else if (typeof window !== 'undefined') {
+        // Only prompt once to avoid annoying the user
+        const hasPrompted = window.localStorage.getItem('prompted_for_name_9565985947890');
+        if (!hasPrompted) {
+          // Ask the user for their preferred name for this device
+          setTimeout(() => {
+            const customName = window.prompt("What would you like to name your device 9565985947890?", "My Field Sensor");
+            if (customName) {
+              window.localStorage.setItem('custom_name_9565985947890', customName);
+              // Refresh the page to show the new name
+              window.location.reload();
+            }
+            window.localStorage.setItem('prompted_for_name_9565985947890', 'true');
+          }, 1000);
+        }
+      }
+    }
+    return device;
+  })
   
   // Handle adding a new device
   const handleAddDevice = async () => {
@@ -134,8 +161,34 @@ export default function DevicesPage() {
       // Get the device name if provided
       const nameToUse = deviceName.trim() || undefined;
       
-      // Claim the existing device with the Field Eyes API
-      const result = await claimDevice(serialNumber, nameToUse)
+      try {
+        // First attempt to claim the existing device with the Field Eyes API
+        console.log(`Attempting to claim device ${serialNumber} with name "${nameToUse || 'not provided'}"`);
+        const result = await claimDevice(serialNumber, nameToUse);
+        
+        console.log("Device claim result:", result);
+        console.log("Device name provided:", nameToUse);
+      } catch (claimErr) {
+        // If the claim fails with a "device not found" error, try to register it first
+        if (claimErr instanceof APIError && claimErr.message.includes("device not found")) {
+          console.log("Device not found, attempting to register it first...");
+          
+          // Register the device first
+          const registerResult = await registerDevice({
+            device_type: "soil_sensor",
+            serial_number: serialNumber
+          });
+          
+          console.log("Device registration result:", registerResult);
+          
+          // Now try to claim it again
+          console.log("Attempting to claim the newly registered device...");
+          await claimDevice(serialNumber, nameToUse);
+        } else {
+          // If it's a different error, rethrow it
+          throw claimErr;
+        }
+      }
       
       toast({
         title: "Device Claimed",
@@ -149,8 +202,20 @@ export default function DevicesPage() {
       
       // Refresh the devices list
       const rawDevices = await getUserDevices()
+      console.log("Raw devices after claiming:", rawDevices);
       const transformedDevices = transformDevices(rawDevices)
-      setDevices(transformedDevices)
+      console.log("Transformed devices after claiming:", transformedDevices);
+      
+      // Find the newly added device and ensure it has the name the user provided
+      const updatedDevices = transformedDevices.map(device => {
+        if (device.serial_number === serialNumber && nameToUse) {
+          console.log(`Manually setting name for device ${serialNumber} to "${nameToUse}"`);
+          return { ...device, name: nameToUse };
+        }
+        return device;
+      });
+      
+      setDevices(updatedDevices)
     } catch (err) {
       console.error("Error claiming device:", err)
       toast({
@@ -307,8 +372,8 @@ export default function DevicesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredDevices.map((device) => (
-                <TableRow key={device.id}>
+              {filteredDevices.filter(device => device !== null && device !== undefined).map((device) => (
+                <TableRow key={device.serial_number}>
                   <TableCell className="font-medium">{device.name}</TableCell>
                   <TableCell>{device.serial_number}</TableCell>
                   <TableCell>

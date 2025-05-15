@@ -12,12 +12,12 @@ export function DeviceInfoPanel({ deviceId }: DeviceInfoPanelProps) {
     id: deviceId,
     name:
       deviceId === "device1"
-        ? "North Field Sensor 1"
+        ? "North Field Sensor"
         : deviceId === "device2"
-          ? "South Field Sensor 1"
+          ? "South Field Sensor"
           : deviceId === "device3"
-            ? "East Field Sensor 1"
-            : "West Field Sensor 1",
+            ? "East Field Sensor"
+            : "West Field Sensor",
     status:
       deviceId === "device1" || deviceId === "device2" ? "active" : deviceId === "device3" ? "warning" : "offline",
     battery: deviceId === "device1" ? 85 : deviceId === "device2" ? 92 : deviceId === "device3" ? 15 : 0,

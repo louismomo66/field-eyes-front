@@ -9,6 +9,9 @@ import { Input } from "@/components/ui/input"
 import { Mail, Lock } from "lucide-react"
 import { login } from "@/lib/field-eyes-api"
 
+// Helper function for asset paths
+const assetPath = (path: string) => `/app${path.startsWith('/') ? path : `/${path}`}`;
+
 export default function LoginPage() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
@@ -48,7 +51,7 @@ export default function LoginPage() {
       {/* Background Image */}
       <div 
         className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: 'url("/african-man-harvesting-vegetables 1.png")' }}
+        style={{ backgroundImage: `url("${assetPath("/african-man-harvesting-vegetables 1.png")}")` }}
       />
       
       {/* Overlay */}
@@ -62,9 +65,10 @@ export default function LoginPage() {
             <div className="flex flex-col items-center space-y-2">
               <div className="h-20 w-40 relative">
                 <Image
-                  src="/Sponsor.png"
+                  src={assetPath("/Sponsor.png")}
                   alt="FieldEyes Logo"
                   fill
+                  sizes="(max-width: 768px) 100vw, 160px"
                   className="object-contain"
                 />
               </div>

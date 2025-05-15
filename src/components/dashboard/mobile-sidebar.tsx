@@ -13,6 +13,8 @@ interface MobileSidebarProps {
 export function MobileSidebar({ currentPath }: MobileSidebarProps) {
   const [open, setOpen] = useState(false)
 
+  const assetPath = (path: string) => `/app${path.startsWith('/') ? path : `/${path}`}`;
+
   const routes = [
     {
       href: "/dashboard",
@@ -51,7 +53,7 @@ export function MobileSidebar({ currentPath }: MobileSidebarProps) {
       </SheetTrigger>
       <SheetContent side="left" className="p-0">
         <div className="flex h-16 items-center border-b px-6">
-          <Link className="flex items-center gap-2 font-semibold" href="#" onClick={() => setOpen(false)}>
+          <Link className="flex items-center gap-2 font-semibold" href="/dashboard" onClick={() => setOpen(false)}>
             <span className="font-bold text-xl">SoilSense</span>
           </Link>
           <Button variant="ghost" size="icon" className="ml-auto" onClick={() => setOpen(false)}>
@@ -84,7 +86,13 @@ export function MobileSidebar({ currentPath }: MobileSidebarProps) {
         </div>
         <div className="border-t p-4">
           <div className="flex items-center gap-4">
-            <img src="/placeholder-user.jpg" width="40" height="40" className="rounded-full border" alt="Avatar" />
+            <img 
+              src={assetPath("/placeholder-user.jpg")} 
+              width="40" 
+              height="40" 
+              className="rounded-full border" 
+              alt="Avatar" 
+            />
             <div className="flex flex-col">
               <span className="text-sm font-medium">John Farmer</span>
               <span className="text-xs text-muted-foreground">john.farmer@example.com</span>

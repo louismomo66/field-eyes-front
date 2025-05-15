@@ -169,12 +169,18 @@ import {
   }
   
   export async function claimDevice(serialNumber: string, deviceName?: string): Promise<{ message: string; device_id: string; serial_number: string }> {
+    console.log(`Claiming device ${serialNumber} with name "${deviceName || 'not provided'}"`);
+    
+    const requestBody = { 
+      serial_number: serialNumber,
+      name: deviceName 
+    };
+    
+    console.log("Request body for claim-device:", requestBody);
+    
     return fetchAPI<{ message: string; device_id: string; serial_number: string }>("/claim-device", {
       method: "POST",
-      body: JSON.stringify({ 
-        serial_number: serialNumber,
-        name: deviceName 
-      }),
+      body: JSON.stringify(requestBody),
     })
   }
   

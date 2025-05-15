@@ -107,7 +107,7 @@ export function RecentReadings() {
           {readings.map((reading) => (
             <TableRow key={`${reading.serial_number}-${reading.created_at}`}>
               <TableCell className="font-medium">{formatRelativeTime(reading.created_at)}</TableCell>
-              <TableCell>{`Field Sensor ${reading.device_id}`}</TableCell>
+              <TableCell>{`Sensor ${reading.device_id}`}</TableCell>
               <TableCell>{reading.soil_moisture !== undefined ? `${reading.soil_moisture}%` : "N/A"}</TableCell>
               <TableCell>{reading.soil_temperature !== undefined ? `${reading.soil_temperature}°C` : "N/A"}</TableCell>
               <TableCell>{reading.ph !== undefined ? reading.ph : "N/A"}</TableCell>

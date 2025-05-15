@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Overview } from "@/components/dashboard/overview"
@@ -12,9 +12,10 @@ import type { Device as FieldEyesDevice, SoilReading as FieldEyesSoilReading } f
 import type { Device as IndexDevice, SoilReading as IndexSoilReading } from "@/types"
 import dynamic from 'next/dynamic'
 import { Skeleton } from "@/components/ui/skeleton"
+import { DashboardMapProps, DashboardMapType } from "./map-types"
 
 // Dynamically import the FixedMap component with no SSR
-const DashboardMap = dynamic(
+const DashboardMap = dynamic<DashboardMapProps>(
   () => import('@/components/dashboard/fixed-map'),
   { 
     ssr: false,
@@ -48,6 +49,9 @@ const transformReadingsForIndicator = (
   readings: FieldEyesSoilReading[],
   sourceDevice: FieldEyesDevice | null
 ): IndexSoilReading[] => {
+  // Add debug logging - show raw data being transformed
+  console.log("Transforming readings:", readings.length > 0 ? readings[0] : "No readings");
+  
   return readings.map(reading => {
     const deviceNameStr = sourceDevice?.name || sourceDevice?.serial_number || reading.serial_number;
     let calculatedStatus: IndexSoilReading['status'] = "optimal";
@@ -55,20 +59,36 @@ const transformReadingsForIndicator = (
       if (reading.soil_moisture < 30) calculatedStatus = "critical";
       else if (reading.soil_moisture > 70) calculatedStatus = "warning";
     }
+    
+    // Convert backend field names to frontend ones
     const transformedReading: IndexSoilReading = {
       id: String(reading.id || `${reading.serial_number}-${reading.created_at}`),
       deviceId: reading.serial_number,
       deviceName: deviceNameStr,
       timestamp: reading.created_at,
+      // Make sure all fields are properly mapped according to the SoilReading interface
       moisture: reading.soil_moisture,
       temperature: reading.soil_temperature,
       ph: reading.ph,
       nitrogen: reading.nitrogen,
-      phosphorus: reading.phosphorous,
+      phosphorus: reading.phosphorous, // Note the spelling difference
       potassium: reading.potassium,
       ec: reading.electrical_conductivity,
       status: calculatedStatus,
     };
+    
+    // Debug transformed data
+    console.log(`Transformed reading fields mapped to SoilReading interface:`, {
+      deviceId: transformedReading.deviceId,
+      moisture: transformedReading.moisture,
+      temperature: transformedReading.temperature,
+      ph: transformedReading.ph,
+      nitrogen: transformedReading.nitrogen,
+      phosphorus: transformedReading.phosphorus,
+      potassium: transformedReading.potassium,
+      ec: transformedReading.ec
+    });
+    
     return transformedReading;
   });
 };
@@ -87,13 +107,37 @@ export default function DashboardPage() {
   const [defaultDevice, setDefaultDevice] = useState<FieldEyesDevice | null>(null)
   const [defaultDeviceReadings, setDefaultDeviceReadings] = useState<FieldEyesSoilReading[]>([])
   const [updateCounter, setUpdateCounter] = useState(0)
+  const [debugEvents, setDebugEvents] = useState<string[]>([])
+  const [hoveredStats, setHoveredStats] = useState<{
+    avgMoisture: number;
+    avgPh: number;
+    alertCount: number;
+    isHovering: boolean;
+    deviceName: string;
+    deviceSerial: string;
+  } | null>(null)
+  const [hoveredDevice, setHoveredDevice] = useState<FieldEyesDevice | null>(null)
+  const [hoveredReadings, setHoveredReadings] = useState<FieldEyesSoilReading[]>([])
+
+  // Helper to add debug events
+  const addDebugEvent = (event: string) => {
+    console.log("DEBUG EVENT:", event);
+    setDebugEvents(prev => [event, ...prev].slice(0, 5)); // Keep last 5 events
+  };
+
+  useEffect(() => {
+    addDebugEvent("Dashboard page mounted");
+  }, []);
 
   const fetchDeviceReadings = async (device: FieldEyesDevice): Promise<FieldEyesSoilReading[]> => {
     try {
+      addDebugEvent(`Fetching readings for device ${device.serial_number}`);
       const readings = await getDeviceLogs(device.serial_number);
+      addDebugEvent(`Got ${readings?.length || 0} readings for device ${device.serial_number}`);
       return readings ? readings.map(r => ({...r})) : [];
     } catch (err) {
       console.error(`Error fetching logs for device ${device.serial_number}:`, err)
+      addDebugEvent(`Error fetching logs for device ${device.serial_number}`);
       return []
     }
   }
@@ -101,6 +145,11 @@ export default function DashboardPage() {
   // Handle device selection from map - simpler version that updates everything directly
   const handleDeviceSelect = useCallback((device: FieldEyesDevice, readings: FieldEyesSoilReading[]) => {
     console.log(`Selected device: ${device.name || device.serial_number} with ${readings.length} readings`);
+    console.log("DEVICE OBJECT:", JSON.stringify(device, null, 2));
+    console.log("FIRST READING:", readings.length > 0 ? JSON.stringify(readings[0], null, 2) : "No readings");
+    
+    // Add debug event
+    addDebugEvent(`Device selected: ${device.name || device.serial_number} (${readings.length} readings)`);
     
     // Create a new copy of the readings to ensure reference changes
     const readingsCopy = [...readings];
@@ -155,7 +204,40 @@ export default function DashboardPage() {
     setUpdateCounter(prev => prev + 1);
     
     console.log(`Dashboard updated with new values - Moisture: ${avgMoisture}%, pH: ${avgPh}`);
+    addDebugEvent(`Dashboard updated with new values - Moisture: ${avgMoisture}%, pH: ${avgPh}`);
   }, [allDevices]);
+
+  // Add global debug interface for console troubleshooting
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // @ts-ignore
+      window.dashboardDebug = {
+        selectDevice: (index: number) => {
+          if (index >= 0 && index < allDevices.length) {
+            const device = allDevices[index];
+            addDebugEvent(`Manual selection of device at index ${index}: ${device.name || device.serial_number}`);
+            fetchDeviceReadings(device).then(readings => {
+              handleDeviceSelect(device, readings);
+            });
+            return `Selected device: ${device.name || device.serial_number}`;
+          }
+          return `Invalid index: ${index}, available: 0-${allDevices.length - 1}`;
+        },
+        listDevices: () => {
+          console.table(allDevices.map((d, i) => ({ 
+            index: i, 
+            name: d.name || "Unnamed", 
+            serial: d.serial_number 
+          })));
+          return `Found ${allDevices.length} devices`;
+        },
+        forceUpdate: () => {
+          setUpdateCounter(prev => prev + 1);
+          return "Forced re-render";
+        }
+      };
+    }
+  }, [allDevices, handleDeviceSelect, fetchDeviceReadings]);
 
   useEffect(() => {
     let mounted = true
@@ -248,9 +330,82 @@ export default function DashboardPage() {
   const currentDevice = selectedDevice || defaultDevice
   const currentReadings = selectedDeviceReadings.length > 0 ? selectedDeviceReadings : defaultDeviceReadings
 
-  // Prepare props for SoilHealthIndicator using adapters
-  const indicatorDevice = transformDeviceForIndicator(currentDevice);
-  const indicatorReadings = transformReadingsForIndicator(currentReadings, currentDevice);
+  // Function to calculate stats for a device
+  const calculateDeviceStats = (readings: FieldEyesSoilReading[]) => {
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    
+    // Filter readings for the last week
+    const weeklyReadings = readings.filter(r => new Date(r.created_at) >= oneWeekAgo);
+    
+    // Calculate moisture and pH averages
+    let totalMoisture = 0, moistureCount = 0, totalPh = 0, phCount = 0;
+    
+    weeklyReadings.forEach(reading => {
+      if (reading.soil_moisture !== undefined) {
+        totalMoisture += reading.soil_moisture;
+        moistureCount++;
+      }
+      if (reading.ph !== undefined) {
+        totalPh += reading.ph;
+        phCount++;
+      }
+    });
+    
+    const avgMoisture = moistureCount > 0 ? Math.round(totalMoisture / moistureCount) : 0;
+    const avgPh = phCount > 0 ? Number.parseFloat((totalPh / phCount).toFixed(1)) : 0;
+    
+    // Count alerts
+    const alertCount = weeklyReadings.filter(r => 
+      (r.ph !== undefined && (r.ph < 5.5 || r.ph > 7.5)) ||
+      (r.soil_moisture !== undefined && (r.soil_moisture < 30 || r.soil_moisture > 70)) ||
+      (r.soil_temperature !== undefined && (r.soil_temperature < 15 || r.soil_temperature > 30)) ||
+      (r.electrical_conductivity !== undefined && (r.electrical_conductivity < 0.5 || r.electrical_conductivity > 1.5))
+    ).length;
+    
+    return { avgMoisture, avgPh, alertCount };
+  };
+  
+  // Handle temp stats update on hover - now stats persist between hovers
+  const handleDeviceHover = useCallback((device: FieldEyesDevice, readings: FieldEyesSoilReading[], isHovering: boolean) => {
+    if (isHovering) {
+      // Calculate stats for the hovered device
+      const stats = calculateDeviceStats(readings);
+      
+      // Store hover stats with device info
+      setHoveredStats({
+        ...stats,
+        isHovering: true,
+        deviceName: device.name || "Sensor",
+        deviceSerial: device.serial_number
+      });
+      
+      // Store hovered device and readings
+      setHoveredDevice(device);
+      setHoveredReadings(readings);
+      
+      addDebugEvent(`Hover stats for ${device.name || device.serial_number}: Moisture: ${stats.avgMoisture}%, pH: ${stats.avgPh}`);
+    }
+    // No longer resetting on mouseout - stats persist until next hover
+  }, []);
+  
+  // Prepare stats for display - use hovered stats if available (persists between hovers)
+  const displayStats = hoveredStats 
+    ? {
+        ...dashboardStats,
+        avgMoisture: hoveredStats.avgMoisture,
+        avgPh: hoveredStats.avgPh,
+        alertCount: hoveredStats.alertCount
+      }
+    : dashboardStats;
+
+  // Determine which device and readings to show in the soil health indicator
+  const displayDevice = hoveredDevice || currentDevice;
+  const displayReadings = hoveredDevice ? hoveredReadings : currentReadings;
+  
+  // Prepare props for SoilHealthIndicator using adapters with either hovered or selected device
+  const indicatorDevice = transformDeviceForIndicator(displayDevice);
+  const indicatorReadings = transformReadingsForIndicator(displayReadings, displayDevice);
 
   if (isLoading) {
     return (
@@ -297,6 +452,8 @@ export default function DashboardPage() {
   return (
     <>
       <div className="flex-col md:flex">
+        {/* REMOVED Debug Panel */}
+        
         <div className="flex-1 space-y-4 p-8 pt-6">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
@@ -319,13 +476,13 @@ export default function DashboardPage() {
                 </svg>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{dashboardStats.totalDevices}</div>
+                <div className="text-2xl font-bold">{displayStats.totalDevices}</div>
                 <p className="text-xs text-muted-foreground">
                   Active monitoring devices
                 </p>
               </CardContent>
             </Card>
-            <Card>
+            <Card className={hoveredStats ? "border-blue-400 transition-all duration-300" : ""}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Average Soil Moisture</CardTitle>
                 <svg
@@ -347,15 +504,19 @@ export default function DashboardPage() {
                 </svg>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{dashboardStats.avgMoisture}%</div>
+                <div className={`text-2xl font-bold transition-all duration-300 ${hoveredStats ? "text-blue-600" : ""}`}>
+                  {displayStats.avgMoisture}%
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  {currentDevice 
-                    ? `Weekly average for ${currentDevice.name || "Selected Device"}`
-                    : "Weekly average across all devices"} | Optimal: 40-60%
+                  {hoveredStats 
+                    ? `${hoveredStats.deviceName} (${hoveredStats.deviceSerial})` 
+                    : currentDevice 
+                      ? `${currentDevice.name || "Selected Device"} (${currentDevice.serial_number})`
+                      : "Weekly average across all devices"} | Optimal: 40-60%
                 </p>
               </CardContent>
             </Card>
-            <Card>
+            <Card className={hoveredStats ? "border-purple-400 transition-all duration-300" : ""}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Average Soil pH</CardTitle>
                 <svg
@@ -373,15 +534,19 @@ export default function DashboardPage() {
                 </svg>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{dashboardStats.avgPh}</div>
+                <div className={`text-2xl font-bold transition-all duration-300 ${hoveredStats ? "text-purple-600" : ""}`}>
+                  {displayStats.avgPh}
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  {currentDevice 
-                    ? `Weekly average for ${currentDevice.name || "Selected Device"}`
-                    : "Weekly average across all devices"} | Optimal: 6.0-7.0
+                  {hoveredStats 
+                    ? `${hoveredStats.deviceName} (${hoveredStats.deviceSerial})` 
+                    : currentDevice 
+                      ? `${currentDevice.name || "Selected Device"} (${currentDevice.serial_number})`
+                      : "Weekly average across all devices"} | Optimal: 6.0-7.0
                 </p>
               </CardContent>
             </Card>
-            <Card>
+            <Card className={hoveredStats ? "border-red-400 transition-all duration-300" : ""}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Alerts</CardTitle>
                 <svg
@@ -398,7 +563,9 @@ export default function DashboardPage() {
                 </svg>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{dashboardStats.alertCount}</div>
+                <div className={`text-2xl font-bold transition-all duration-300 ${hoveredStats ? "text-red-600" : ""}`}>
+                  {displayStats.alertCount}
+                </div>
                 <p className="text-xs text-muted-foreground">
                   Active alerts requiring attention
                 </p>
@@ -413,7 +580,8 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent className="p-0" style={{ height: '600px', position: 'relative' }}>
                 <DashboardMap 
-                  onDeviceSelect={handleDeviceSelect} 
+                  onDeviceSelect={handleDeviceSelect}
+                  onDeviceHover={handleDeviceHover}
                 />
               </CardContent>
             </Card>
@@ -421,15 +589,17 @@ export default function DashboardPage() {
               <CardHeader>
                 <CardTitle>Soil Health</CardTitle>
                 <CardDescription>
-                  {currentDevice 
-                    ? `Soil health indicators for ${currentDevice.name || currentDevice.serial_number}`
-                    : "No device data available"
+                  {hoveredDevice 
+                    ? `Soil health indicators for ${hoveredDevice.name || hoveredDevice.serial_number}`
+                    : currentDevice 
+                      ? `Soil health indicators for ${currentDevice.name || currentDevice.serial_number}`
+                      : "No device data available"
                   }
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <SoilHealthIndicator 
-                  key={`soil-indicator-${currentDevice?.serial_number}-${updateCounter}-${Math.random()}`}
+                  key={`soil-indicator-${displayDevice?.serial_number}-${updateCounter}-${hoveredDevice ? "hovered" : "selected"}`}
                   device={indicatorDevice} 
                   readings={indicatorReadings}
                 />

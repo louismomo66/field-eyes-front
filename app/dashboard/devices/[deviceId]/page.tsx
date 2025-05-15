@@ -1428,7 +1428,9 @@ export default function DeviceDetailsPage() {
       if (!deviceInfo) {
         try {
           const devices = await getUserDevices();
+          console.log("Device list for detail page:", devices);
           deviceDetails = devices.find(d => d.serial_number === deviceId);
+          console.log(`Found device details for ${deviceId}:`, deviceDetails);
         } catch (err) {
           console.error("Error fetching device details:", err);
         }
@@ -1482,9 +1484,35 @@ export default function DeviceDetailsPage() {
       
       // Update basic device info if it's first load or status has changed
       if (!deviceInfo || deviceInfo.status !== status) {
+        // Special handling for device 9565985947890
+        let deviceName = deviceDetails?.name || `Sensor ${deviceId}`;
+        
+        // If this is the specific device, check if we have a stored custom name
+        if (deviceId === "9565985947890" && typeof window !== 'undefined') {
+          const storedName = window.localStorage.getItem('custom_name_9565985947890');
+          if (storedName) {
+            deviceName = storedName;
+            console.log(`Using stored custom name for device 9565985947890: "${storedName}"`);
+          } else {
+            // If no stored name yet, use the device details name or create a prompt to enter one
+            const hasPrompted = window.localStorage.getItem('prompted_for_name_9565985947890');
+            if (!hasPrompted) {
+              setTimeout(() => {
+                const customName = window.prompt("What would you like to name your device?", "My Field Sensor");
+                if (customName) {
+                  window.localStorage.setItem('custom_name_9565985947890', customName);
+                  // Refresh the page to show the new name
+                  window.location.reload();
+                }
+                window.localStorage.setItem('prompted_for_name_9565985947890', 'true');
+              }, 1000);
+            }
+          }
+        }
+        
         setDeviceInfo({
           id: deviceId,
-          name: deviceDetails?.name || `Field Sensor ${transformedReading.device_id || deviceId}`,
+          name: deviceName,
           status,
         })
       }

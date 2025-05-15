@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Mail } from "lucide-react"
 
+// Helper function for asset paths
+const assetPath = (path: string) => `/app${path.startsWith('/') ? path : `/${path}`}`;
+
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -59,7 +62,7 @@ export default function ForgotPasswordPage() {
       {/* Background Image */}
       <div 
         className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: 'url("/african-man-harvesting-vegetables 1.png")' }}
+        style={{ backgroundImage: `url("${assetPath("/african-man-harvesting-vegetables 1.png")}")` }}
       />
       
       {/* Overlay */}
@@ -73,9 +76,10 @@ export default function ForgotPasswordPage() {
             <div className="flex flex-col items-center space-y-2">
               <div className="h-20 w-40 relative">
                 <Image
-                  src="/Sponsor.png"
+                  src={assetPath("/Sponsor.png")}
                   alt="FieldEyes Logo"
                   fill
+                  sizes="(max-width: 768px) 100vw, 160px"
                   className="object-contain"
                 />
               </div>

@@ -61,7 +61,7 @@ export default function GenerateReportPage() {
           .filter((device: any) => device && (device.id || device.serial_number))
           .map((device: any) => ({
             id: String(device.id || device.serial_number),
-            name: device.name || `Field Sensor ${device.id || device.serial_number}`,
+            name: device.name || `Sensor ${device.id || device.serial_number}`,
             status: device.status || "active",
             lat: device.lat || 0,
             lng: device.lng || 0,
