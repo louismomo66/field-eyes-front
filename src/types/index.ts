@@ -97,6 +97,7 @@ export interface DetailedReportData {
 export interface Notification {
   id: string
   type: "info" | "warning" | "error" | "success"
+  channel?: "email" | "sms" | "push"
   message: string
   time: string
   read: boolean

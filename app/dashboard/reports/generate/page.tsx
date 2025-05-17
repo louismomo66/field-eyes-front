@@ -31,8 +31,6 @@ export default function GenerateReportPage() {
   const [startDate, setStartDate] = useState<Date | undefined>(subMonths(new Date(), 1))
   const [endDate, setEndDate] = useState<Date | undefined>(new Date())
   const [dateRange, setDateRange] = useState("30days")
-  const [includeTreatment, setIncludeTreatment] = useState(true)
-  const [includeSeasonalPlan, setIncludeSeasonalPlan] = useState(true)
   const [reportFormat, setReportFormat] = useState("pdf")
   const [showPreview, setShowPreview] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -61,7 +59,7 @@ export default function GenerateReportPage() {
           .filter((device: any) => device && (device.id || device.serial_number))
           .map((device: any) => ({
             id: String(device.id || device.serial_number),
-            name: device.name || `Sensor ${device.id || device.serial_number}`,
+            name: device.name || `Field Sensor ${device.id || device.serial_number}`,
             status: device.status || "active",
             lat: device.lat || 0,
             lng: device.lng || 0,
@@ -146,8 +144,8 @@ export default function GenerateReportPage() {
         devices: selectedDevices,
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
-        includeTreatment,
-        includeSeasonalPlan,
+        includeTreatment: true,
+        includeSeasonalPlan: true,
         format: reportFormat,
       }
 
@@ -299,6 +297,137 @@ export default function GenerateReportPage() {
     (device.name && device.name.toLowerCase().includes(deviceSearch.toLowerCase())) ||
     String(device.id).includes(deviceSearch)
   )
+
+  // New function to convert device logs to CSV format with all data fields
+  const convertDeviceLogsToCsv = (logs: any[], deviceName: string) => {
+    if (!logs || logs.length === 0) {
+      return [["No data available for the selected device and date range"]];
+    }
+    
+    console.log(`Converting ${logs.length} logs to CSV for device ${deviceName}`);
+    
+    // Fields to exclude from the CSV export
+    const excludedFields = [
+      'updated_at', 
+      'deleted_at', 
+      'device_id',
+      'UpdatedAt',
+      'DeletedAt',
+      'DeviceId'
+    ];
+    
+    // Create a comprehensive set of all fields present in any log
+    const allFields = new Set<string>();
+    logs.forEach(log => {
+      Object.keys(log).forEach(key => {
+        // Skip internal fields, function fields, and excluded fields
+        if (!key.startsWith('_') && 
+            typeof log[key] !== 'function' && 
+            !excludedFields.includes(key) &&
+            !excludedFields.includes(key.toLowerCase())) {
+          allFields.add(key);
+        }
+      });
+    });
+    
+    // Prioritize important fields in a specific order
+    const priorityFields = [
+      'created_at',              // Timestamp (keep this for time ordering)
+      'timestamp',               // Alternative timestamp field
+      'serial_number',           // Device ID
+      'electrical_conductivity', // EC (primary field)
+      'ec',                      // EC (alias)
+      'soil_moisture',           // Soil moisture
+      'moisture',                // Moisture alias
+      'soil_temperature',        // Soil temperature
+      'temperature',             // Air temperature
+      'ph',                      // pH level
+      'nitrogen',                // NPK - Nitrogen
+      'phosphorous',             // NPK - Phosphorus
+      'phosphorus',              // Phosphorus alias
+      'potassium',               // NPK - Potassium
+      'longitude',               // GPS coordinates
+      'latitude',                // GPS coordinates
+    ];
+    
+    // Filter out excluded fields and create ordered field list
+    const filteredFields = Array.from(allFields).filter(field => 
+      !excludedFields.includes(field) && 
+      !excludedFields.includes(field.toLowerCase())
+    );
+    
+    // Find timestamp field - prefer 'created_at', fallback to 'timestamp'
+    const timestampField = 
+      filteredFields.includes('created_at') ? 'created_at' : 
+      filteredFields.includes('timestamp') ? 'timestamp' : null;
+    
+    // Create ordered field list with timestamp first if available
+    let orderedFields = [];
+    
+    // Add timestamp first if available
+    if (timestampField) {
+      orderedFields.push(timestampField);
+    }
+    
+    // Add remaining fields in priority order
+    orderedFields = [
+      ...orderedFields,
+      ...priorityFields.filter(field => 
+        filteredFields.includes(field) && field !== timestampField
+      ),
+      ...filteredFields.filter(field => 
+        !priorityFields.includes(field) && field !== timestampField
+      )
+    ];
+    
+    // Create header row with nicely formatted field names
+    const headers = orderedFields.map(field => {
+      // Format field names for readability (capitalize, replace underscores with spaces)
+      return field
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    });
+    
+    // Create CSV data with header row first
+    const csvData = [headers];
+    
+    // Add all log entries as rows
+    logs.forEach(log => {
+      const row = orderedFields.map(field => {
+        const value = log[field];
+        
+        // Format date fields for readability
+        if ((field === 'created_at' || field === 'timestamp') && value) {
+          try {
+            const date = new Date(value);
+            return date.toLocaleString();
+          } catch (e) {
+            console.warn(`Error formatting date: ${value}`, e);
+            return value;
+          }
+        }
+        
+        // Format numerical fields with proper precision
+        if (typeof value === 'number') {
+          // Use 4 decimal places for EC values for higher precision
+          if (field === 'ec' || field === 'electrical_conductivity') {
+            return value.toFixed(4);
+          }
+          // Use 2 decimal places for other numerical values
+          return value.toFixed(2);
+        }
+        
+        // Return value or empty string if null/undefined
+        return value !== undefined && value !== null ? value : '';
+      });
+      
+      csvData.push(row);
+    });
+    
+    console.log(`CSV report prepared with ${csvData.length} rows (including header)`);
+    return csvData;
+  }
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-screen">Loading devices...</div>
@@ -536,61 +665,41 @@ export default function GenerateReportPage() {
                             setReportType(value);
                           }
                         }}
-                        className="flex flex-col space-y-1"
+                        className="flex flex-col space-y-4"
                       >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="comprehensive" id="comprehensive" />
-                          <Label htmlFor="comprehensive">Comprehensive Report</Label>
+                        <div className="space-y-2 border rounded-md p-3 hover:bg-gray-50 cursor-pointer">
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="comprehensive" id="comprehensive" />
+                            <Label htmlFor="comprehensive" className="cursor-pointer font-medium">Comprehensive Report</Label>
+                          </div>
+                          <p className="text-sm text-gray-600 ml-6">
+                            Complete soil health analysis with detailed soil parameters, crop recommendations, 
+                            treatment suggestions, and a seasonal management plan based on your device data.
+                          </p>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="basic" id="basic" />
-                          <Label htmlFor="basic">Basic Soil Analysis</Label>
+                        
+                        <div className="space-y-2 border rounded-md p-3 hover:bg-gray-50 cursor-pointer">
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="basic" id="basic" />
+                            <Label htmlFor="basic" className="cursor-pointer font-medium">Basic Soil Analysis</Label>
+                          </div>
+                          <p className="text-sm text-gray-600 ml-6">
+                            Essential soil parameters and ratings with visual indicators
+                            of soil health status for the selected time period.
+                          </p>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="crop" id="crop" />
-                          <Label htmlFor="crop">Crop-Specific Report</Label>
+                        
+                        <div className="space-y-2 border rounded-md p-3 hover:bg-gray-50 cursor-pointer">
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="crop" id="crop" />
+                            <Label htmlFor="crop" className="cursor-pointer font-medium">Crop-Specific Report</Label>
+                          </div>
+                          <p className="text-sm text-gray-600 ml-6">
+                            Tailored analysis for specific crops with customized recommendations
+                            based on the crop's unique requirements.
+                          </p>
                         </div>
                       </RadioGroup>
-                  </div>
-
-                  <div className="space-y-4">
-                    <Label>Report Sections</Label>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox id="executive" defaultChecked disabled />
-                        <Label htmlFor="executive" className="text-muted-foreground">
-                          Executive Summary
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox id="soil-indicators" defaultChecked disabled />
-                        <Label htmlFor="soil-indicators" className="text-muted-foreground">
-                          Soil Health Indicators
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox id="crop-recommendations" defaultChecked disabled />
-                        <Label htmlFor="crop-recommendations" className="text-muted-foreground">
-                          Crop Recommendations
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="treatment"
-                          checked={includeTreatment}
-                          onCheckedChange={(checked) => setIncludeTreatment(checked as boolean)}
-                        />
-                        <Label htmlFor="treatment">Treatment Recommendations</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="seasonal"
-                          checked={includeSeasonalPlan}
-                          onCheckedChange={(checked) => setIncludeSeasonalPlan(checked as boolean)}
-                        />
-                        <Label htmlFor="seasonal">Seasonal Management Plan</Label>
-                      </div>
-                    </div>
                   </div>
                 </>
               )}
@@ -680,8 +789,8 @@ export default function GenerateReportPage() {
                 ) : (
                   <ReportPreview 
                     reportData={reportData as any} 
-                    includeTreatment={includeTreatment} 
-                    includeSeasonalPlan={includeSeasonalPlan} 
+                    includeTreatment={true}
+                    includeSeasonalPlan={true}
                   />
                 )
               ) : (

@@ -29,7 +29,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (typeof window !== "undefined") {
       localStorage.removeItem("token")
     }
-    router.push("/login")
+    router.push("/app/login")
   }
   
   // Global error handler for unauthorized errors

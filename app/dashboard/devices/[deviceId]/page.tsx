@@ -1,6 +1,7 @@
 "use client"
 
 import { useParams, useRouter } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import { useState, useEffect, useRef, memo, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -26,6 +27,7 @@ import {
   PieChart,
   LineChart,
   ClipboardList,
+  RefreshCw,
 } from "lucide-react"
 import { getLatestDeviceLog, getDeviceLogs, getUserDevices } from "@/lib/field-eyes-api"
 import { transformSoilReading } from "@/lib/transformers"
@@ -1346,32 +1348,37 @@ const ReadingsGrid = memo(
 
 ReadingsGrid.displayName = 'ReadingsGrid';
 
+// Define required types
+type DeviceInfo = {
+  id: string;
+  name: string;
+  status: string;
+};
+
+type DeviceAlertItem = {
+  type: string;
+  message: string;
+  time: string;
+  icon: React.ComponentType<{ className?: string }>;
+};
+
 // Main page component
 export default function DeviceDetailsPage() {
-  const params = useParams()
   const router = useRouter()
+  const params = useParams()
   const deviceId = params.deviceId as string
-
-  // Static device info that doesn't change often
-  const [deviceInfo, setDeviceInfo] = useState<{
-    id: string;
-    name: string;
-    status: string;
-  } | null>(null)
   
-  // Readings that change frequently but shouldn't cause a full page re-render
-  const [readings, setReadings] = useState<ReadingsData | null>(null)
-  const [deviceAlerts, setDeviceAlerts] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false) // New state for refresh indicator
   const [error, setError] = useState<string | null>(null)
+  const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null)
+  const [readings, setReadings] = useState<ReadingsData | null>(null)
+  const [deviceAlerts, setDeviceAlerts] = useState<DeviceAlertItem[]>([])
   
-  // Store last updated time in a ref to avoid triggering re-renders
-  const lastUpdatedRef = useRef(new Date())
-  
-  // Use a separate ref to track auto-refresh
+  // Use refs to minimize re-renders
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null)
-  // Use a ref to track the previous readings to avoid unnecessary updates
   const prevReadingsRef = useRef<ReadingsData | null>(null)
+  const lastUpdatedRef = useRef<Date>(new Date())
 
   // Function to format date and time
   const formatDateTime = (timestamp: string) => {
@@ -1396,29 +1403,35 @@ export default function DeviceDetailsPage() {
   const haveReadingsChanged = (current: ReadingsData, previous: ReadingsData) => {
     if (!previous) return true;
     
-    // Check if any values have changed by more than 0.1
+    // Use a more precise comparison with configurable threshold
+    const CHANGE_THRESHOLD = 0.1; // Only consider changes greater than this
               return (
-      Math.abs(current.humidity.value - previous.humidity.value) > 0.1 ||
-      Math.abs(current.ambientTemp.value - previous.ambientTemp.value) > 0.1 ||
-      Math.abs(current.moisture.value - previous.moisture.value) > 0.1 ||
-      Math.abs(current.temperature.value - previous.temperature.value) > 0.1 ||
-      Math.abs(current.ph.value - previous.ph.value) > 0.1 ||
-      Math.abs(current.ec.value - previous.ec.value) > 0.1 ||
-      Math.abs(current.nitrogen.value - previous.nitrogen.value) > 0.1 ||
-      Math.abs(current.phosphorus.value - previous.phosphorus.value) > 0.1 ||
-      Math.abs(current.potassium.value - previous.potassium.value) > 0.1 ||
+      Math.abs(current.humidity.value - previous.humidity.value) > CHANGE_THRESHOLD ||
+      Math.abs(current.ambientTemp.value - previous.ambientTemp.value) > CHANGE_THRESHOLD ||
+      Math.abs(current.moisture.value - previous.moisture.value) > CHANGE_THRESHOLD ||
+      Math.abs(current.temperature.value - previous.temperature.value) > CHANGE_THRESHOLD ||
+      Math.abs(current.ph.value - previous.ph.value) > CHANGE_THRESHOLD ||
+      Math.abs(current.ec.value - previous.ec.value) > CHANGE_THRESHOLD ||
+      Math.abs(current.nitrogen.value - previous.nitrogen.value) > CHANGE_THRESHOLD ||
+      Math.abs(current.phosphorus.value - previous.phosphorus.value) > CHANGE_THRESHOLD ||
+      Math.abs(current.potassium.value - previous.potassium.value) > CHANGE_THRESHOLD ||
       current.humidity.time !== previous.humidity.time
     );
   }
 
   // Function to fetch device data
-  const fetchDeviceData = async () => {
+  const fetchDeviceData = async (silentRefresh = false) => {
     if (!deviceId) return
     
     try {
-      // Only show loading on first load
-      if (!deviceInfo) {
+      // Only show loading on first load, not during auto-refresh
+      if (!deviceInfo && !silentRefresh) {
         setIsLoading(true)
+      }
+      
+      // Set refreshing state for visual indicator
+      if (silentRefresh) {
+        setIsRefreshing(true);
       }
       
       setError(null)
@@ -1532,7 +1545,7 @@ export default function DeviceDetailsPage() {
           time: latestReading ? formatDateTime(transformedReading.created_at || transformedReading.timestamp || '') : "No data"
         },
         temperature: { 
-          value: transformedReading.temperature || transformedReading.soil_temperature || 0,
+          value: transformedReading.soil_temperature || 0,
           time: latestReading ? formatDateTime(transformedReading.created_at || transformedReading.timestamp || '') : "No data"
         },
         ph: { 
@@ -1597,6 +1610,12 @@ export default function DeviceDetailsPage() {
       if (isLoading) {
         setIsLoading(false)
       }
+      
+      // Reset refreshing state
+      if (silentRefresh) {
+        // Short delay to allow user to see refresh indicator
+        setTimeout(() => setIsRefreshing(false), 300);
+      }
     } catch (err) {
       console.error("Error fetching device data:", err)
       // Only set error if we don't have any existing data
@@ -1605,6 +1624,9 @@ export default function DeviceDetailsPage() {
       }
       if (isLoading) {
         setIsLoading(false)
+      }
+      if (silentRefresh) {
+        setIsRefreshing(false);
       }
     }
   }
@@ -1617,6 +1639,9 @@ export default function DeviceDetailsPage() {
   
   // Set up auto-refresh interval (every 30 seconds)
   useEffect(() => {
+    // Track whether a fetch is in progress to prevent overlapping calls
+    let isFetchingRef = false;
+    
     // Use a separate function for auto-refresh
     const setupAutoRefresh = () => {
       // Clear any existing timer
@@ -1627,10 +1652,18 @@ export default function DeviceDetailsPage() {
       // Start a new timer with staggered fetching to avoid simultaneous updates
       const startAutoRefresh = () => {
         refreshTimerRef.current = setInterval(() => {
+          // Skip if a fetch is already in progress
+          if (isFetchingRef) return;
+          
           // Use requestAnimationFrame to ensure smooth updates
           // This also helps prevent layout thrashing
           requestAnimationFrame(() => {
-            fetchDeviceData()
+            isFetchingRef = true;
+            
+            // Use the silent refresh option to avoid showing loading state
+            fetchDeviceData(true).finally(() => {
+              isFetchingRef = false;
+            });
           })
         }, 30000) // 30 seconds in milliseconds
       }
@@ -1659,8 +1692,8 @@ export default function DeviceDetailsPage() {
   }, [deviceId])
 
   // Calculate alerts based on soil parameters
-  const calculateAlerts = (reading: SoilReading) => {
-    const alerts = []
+  const calculateAlerts = (reading: SoilReading): DeviceAlertItem[] => {
+    const alerts: DeviceAlertItem[] = []
     
     // Check soil moisture
     if (reading.moisture !== undefined && reading.moisture < 30) {
@@ -1782,7 +1815,28 @@ export default function DeviceDetailsPage() {
 
       {/* Readings section */}
       <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">Readings & Measurements</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">Readings & Measurements</h2>
+          {/* Refresh button and indicator */}
+          <div className="flex items-center">
+            {isRefreshing && (
+              <span className="text-xs text-gray-500 mr-2 flex items-center">
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                Refreshing...
+              </span>
+            )}
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => fetchDeviceData(true)}
+              disabled={isRefreshing}
+              className="h-8 px-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              <span className="sr-only">Refresh</span>
+            </Button>
+          </div>
+        </div>
         {MemoizedReadingsSection}
       </div>
 

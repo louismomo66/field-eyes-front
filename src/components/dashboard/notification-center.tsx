@@ -180,18 +180,18 @@ export function NotificationCenter({
   };
 
   // Helper function to get icon based on notification type
-  const getNotificationIcon = (type: string) => {
+  const getNotificationIcon = (type: string, key?: string) => {
     switch (type) {
       case "info":
-        return <Info key={`icon-info`} className="h-5 w-5 text-blue-500" />
+        return <Info className="h-5 w-5 text-blue-500" />
       case "warning":
-        return <AlertTriangle key={`icon-warning`} className="h-5 w-5 text-amber-500" />
+        return <AlertTriangle className="h-5 w-5 text-amber-500" />
       case "error":
-        return <AlertTriangle key={`icon-error`} className="h-5 w-5 text-red-500" />
+        return <AlertTriangle className="h-5 w-5 text-red-500" />
       case "success":
-        return <CheckCircle key={`icon-success`} className="h-5 w-5 text-green-500" />
+        return <CheckCircle className="h-5 w-5 text-green-500" />
       default:
-        return <Info key={`icon-default`} className="h-5 w-5 text-blue-500" />
+        return <Info className="h-5 w-5 text-blue-500" />
     }
   }
 
@@ -283,12 +283,12 @@ export function NotificationCenter({
             disabled={isClearing || notifications.length === 0}
           >
             {isClearing ? (
-              <React.Fragment key="clearing">
+              <React.Fragment>
                 <RefreshCw className="h-3 w-3 animate-spin" />
                 Clearing...
               </React.Fragment>
             ) : (
-              <React.Fragment key="clear-all">
+              <React.Fragment>
                 <Trash2 className="h-3 w-3" />
                 Clear All
               </React.Fragment>
@@ -306,12 +306,14 @@ export function NotificationCenter({
               {deviceId ? `No notifications for this device` : `No notifications`}
             </div>
           ) : (
-            Array.isArray(notifications) && notifications.map((notification) => (
+            notifications.map((notification) => (
               <div
-                key={notification.id}
+                key={notification.id || `notification-${notification.time || Math.random()}`}
                 className={`flex items-start space-x-2 rounded-md border p-3 ${notification.read ? "bg-gray-50" : ""}`}
               >
-                {getNotificationIcon(notification.type)}
+                <div className="flex-shrink-0">
+                  {getNotificationIcon(notification.type)}
+                </div>
                 <div className="flex-1 space-y-1">
                   <p className="text-sm font-medium leading-none">{notification.message}</p>
                   <p className="text-xs text-muted-foreground">

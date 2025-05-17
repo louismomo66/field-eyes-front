@@ -1,6 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Image from "next/image";
 
+// Helper function for asset paths
+const assetPath = (path: string) => `/app${path.startsWith('/') ? path : `/${path}`}`;
+
 interface Parameter {
   name: string;
   unit: string;
@@ -144,9 +147,10 @@ export function BasicSoilAnalysis({ data }: BasicSoilAnalysisProps) {
         <div className="flex justify-between items-center mb-4">
           <div className="h-16 w-32 relative">
             <Image
-              src="/logo.png"
+              src={assetPath("/logo.png")}
               alt="FieldEyes Logo"
               fill
+              sizes="(max-width: 768px) 100vw, 128px"
               className="object-contain"
             />
           </div>

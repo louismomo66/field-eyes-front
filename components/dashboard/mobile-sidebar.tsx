@@ -4,6 +4,9 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Home, Cpu, FileText, Settings, Menu, X, LogOut } from "lucide-react";
 
+// Helper function for asset paths
+const assetPath = (path: string) => `/app${path.startsWith('/') ? path : `/${path}`}`;
+
 interface MobileSidebarProps {
   currentPath: string;
   className?: string;
@@ -68,7 +71,7 @@ export function MobileSidebar({ currentPath, className }: MobileSidebarProps) {
         }}>
           <div className="flex items-center gap-2">
             <img 
-              src="/logo.png" 
+              src={assetPath("/logo.png")} 
               alt="FieldEyes Logo" 
               className="h-12 w-auto object-contain"
               style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.1))' }}
@@ -121,7 +124,7 @@ export function MobileSidebar({ currentPath, className }: MobileSidebarProps) {
           <button 
             onClick={() => {
               localStorage.removeItem("token");
-              window.location.href = "/login";
+              window.location.href = "/app/login";
             }}
             className="w-full flex items-center justify-center gap-3 rounded-lg px-4 py-3 text-base font-medium text-gray-200 hover:bg-white/10 transition-all duration-200"
             style={{

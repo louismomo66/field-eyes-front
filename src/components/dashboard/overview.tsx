@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { getSoilReadings, getDevices } from "@/lib/api"
-import type { SoilReading, Device } from "@/types"
+import type { SoilReading as IndexSoilReading, Device } from "@/types"
+import type { SoilReading as FieldEyesSoilReading } from "@/types/field-eyes"
 
 export function Overview() {
   const [data, setData] = useState<any[]>([])
@@ -48,8 +49,25 @@ export function Overview() {
         // Fetch soil readings for the selected device
         const readings = await getSoilReadings(selectedDevice.id)
 
+        // Map readings to the expected format
+        const mappedReadings = readings.map(reading => ({
+          // Required fields from IndexSoilReading type
+          id: reading.id?.toString() || `reading-${reading.device_id}-${Date.now()}`,
+          deviceId: reading.device_id.toString(),
+          deviceName: selectedDevice.name,
+          status: "optimal",
+          // Fields used in the processReadingsForChart function
+          moisture: reading.moisture || reading.soil_moisture,
+          temperature: reading.temperature || reading.soil_temperature,
+          ph: reading.ph,
+          // Add EC field with fallbacks
+          ec: reading.ec !== undefined ? Number(reading.ec) : 
+               reading.electrical_conductivity !== undefined ? Number(reading.electrical_conductivity) : undefined,
+          timestamp: reading.created_at || new Date().toISOString()
+        } as IndexSoilReading))
+
         // Process the data for the chart
-        const processedData = processReadingsForChart(readings)
+        const processedData = processReadingsForChart(mappedReadings)
 
         setData(processedData)
         setIsLoading(false)
@@ -64,7 +82,7 @@ export function Overview() {
   }, [selectedDevice])
 
   // Process readings into chart-friendly format
-  const processReadingsForChart = (readings: SoilReading[]) => {
+  const processReadingsForChart = (readings: IndexSoilReading[]) => {
     // Group readings by date/time period
     const groupedData: { [key: string]: any } = {}
 
@@ -78,6 +96,7 @@ export function Overview() {
           moisture: 0,
           temperature: 0,
           ph: 0,
+          ec: 0,
           count: 0,
         }
       }
@@ -86,6 +105,7 @@ export function Overview() {
       if (reading.moisture !== undefined) groupedData[date].moisture += reading.moisture
       if (reading.temperature !== undefined) groupedData[date].temperature += reading.temperature
       if (reading.ph !== undefined) groupedData[date].ph += reading.ph
+      if (reading.ec !== undefined) groupedData[date].ec += reading.ec
       groupedData[date].count++
     })
 
@@ -95,6 +115,7 @@ export function Overview() {
       moisture: group.count > 0 ? Number((group.moisture / group.count).toFixed(2)) : 0,
       temperature: group.count > 0 ? Number((group.temperature / group.count).toFixed(2)) : 0,
       ph: group.count > 0 ? Number((group.ph / group.count).toFixed(2)) : 0,
+      ec: group.count > 0 ? Number((group.ec / group.count).toFixed(2)) : 0,
     }))
   }
 
@@ -203,6 +224,13 @@ export function Overview() {
             dataKey="ph" 
             name="pH" 
             stroke="#10b981" 
+          />
+          <Line 
+            yAxisId="right" 
+            type="monotone" 
+            dataKey="ec" 
+            name="EC (mS/cm)" 
+            stroke="#06b6d4" 
           />
         </LineChart>
       </ResponsiveContainer>
