@@ -16,8 +16,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
 import { format as formatDate, subDays, subMonths } from "date-fns"
-import { getUserDevices } from "@/lib/field-eyes-api"
-import { generateReport } from "@/lib/api"
+import { getUserDevices, registerDevice, claimDevice } from "@/lib/field-eyes-api"
+import { generateReport, getDevice } from "@/lib/api"
 import { transformDevices } from "@/lib/transformers"
 import type { Device, ReportData, BasicSoilAnalysisReport } from "@/types"
 import { Badge } from "@/components/ui/badge"
@@ -138,6 +138,34 @@ export default function GenerateReportPage() {
     try {
       setIsGenerating(true)
       setError(null)
+
+      // Verify device exists first
+      let device;
+      try {
+        device = await getDevice(selectedDevices[0]);
+        console.log("Found device:", device);
+      } catch (err) {
+        // Try to register and claim the device
+        try {
+          console.log("Device not found, attempting to register...");
+          await registerDevice({
+            device_type: "soil_sensor",
+            serial_number: selectedDevices[0]
+          });
+          
+          console.log("Device registered, attempting to claim...");
+          await claimDevice(selectedDevices[0], `Soil Sensor ${selectedDevices[0]}`);
+          
+          // Try to get the device again
+          device = await getDevice(selectedDevices[0]);
+          console.log("Device successfully registered and claimed:", device);
+        } catch (regErr) {
+          console.error("Error registering device:", regErr);
+          setError("Failed to register device. Please verify the device serial number and try again.");
+          setIsGenerating(false);
+          return;
+        }
+      }
 
       // Prepare options for report generation
       const options = {
