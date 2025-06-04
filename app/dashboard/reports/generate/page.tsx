@@ -19,7 +19,7 @@ import { format as formatDate, subDays, subMonths } from "date-fns"
 import { getUserDevices } from "@/lib/field-eyes-api"
 import { generateReport } from "@/lib/api"
 import { transformDevices } from "@/lib/transformers"
-import type { Device, ReportData } from "@/types"
+import type { Device, ReportData, BasicSoilAnalysisReport } from "@/types"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 
@@ -150,7 +150,21 @@ export default function GenerateReportPage() {
       }
 
       let data;
-      if (reportType === "basic") {
+      if (reportFormat === "csv") {
+        // Generate CSV data
+        console.log("Generating CSV report for device:", selectedDevices[0]);
+        data = await generateReport(
+          selectedDevices[0],
+          "basic", // Use basic type for CSV
+          dateRange,
+          options
+        );
+        console.log("CSV data received:", data);
+        
+        // Convert the data to CSV format
+        const csvData = convertDeviceLogsToCsv((data as BasicSoilAnalysisReport).parameters, (data as BasicSoilAnalysisReport).device_name);
+        setCsvData(csvData);
+      } else if (reportType === "basic") {
         // Get the auth token from localStorage
         const token = localStorage.getItem('token');
         if (!token) {
@@ -188,7 +202,7 @@ export default function GenerateReportPage() {
         }
         
         data = await response.json();
-        console.log("Report data received:", data);
+        setReportData(data);
       } else {
         // Generate report using existing API for other report types
         data = await generateReport(
@@ -196,13 +210,8 @@ export default function GenerateReportPage() {
           reportType,
           dateRange,
           options,
-        )
-      }
-
-      if (reportFormat === "pdf") {
-        setReportData(data)
-      } else {
-        setCsvData(reportType === "basic" ? convertBasicReportToCsv(data) : (data as any).csvData || [])
+        );
+        setReportData(data);
       }
 
       setShowPreview(true)
@@ -215,29 +224,87 @@ export default function GenerateReportPage() {
   }
 
   const convertBasicReportToCsv = (data: any) => {
-    if (!data || !data.parameters) return [];
+    // If data contains parameters array, it's a basic soil analysis report
+    if (data.parameters && Array.isArray(data.parameters) && data.parameters[0]?.name) {
+      // Header row for basic soil analysis
+      const csvData = [
+        ["Parameter", "Unit", "Ideal Min", "Ideal Max", "Average", "Min", "Max", "Rating", "CEC (if applicable)"]
+      ];
+      
+      // Data rows for basic soil analysis
+      data.parameters.forEach((param: any) => {
+        csvData.push([
+          param.name,
+          param.unit,
+          param.ideal_min,
+          param.ideal_max,
+          param.average,
+          param.min,
+          param.max,
+          param.rating,
+          param.cec || ""
+        ]);
+      });
+      
+      return csvData;
+    }
     
-    // Header row
-    const csvData = [
-      ["Parameter", "Unit", "Ideal Min", "Ideal Max", "Average", "Min", "Max", "Rating", "CEC (if applicable)"]
-    ];
+    // If data contains parameters array with raw logs, it's a device logs export
+    if (data.parameters && Array.isArray(data.parameters)) {
+      const logs = data.parameters;
+      if (logs.length === 0) {
+        return [["No data available for the selected period"]];
+      }
+      
+      // Get all possible fields from the logs
+      const fields = new Set<string>();
+      logs.forEach((log: any) => {
+        Object.keys(log).forEach(key => {
+          if (!key.startsWith('_') && typeof log[key] !== 'function') {
+            fields.add(key);
+          }
+        });
+      });
+      
+      // Create headers
+      const headers = Array.from(fields).map(field => 
+        field.split('_')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ')
+      );
+      
+      // Create CSV data with headers
+      const csvData = [headers];
+      
+      // Add data rows
+      logs.forEach((log: any) => {
+        const row = Array.from(fields).map(field => {
+          const value = log[field];
+          
+          // Format dates
+          if ((field === 'created_at' || field === 'timestamp') && value) {
+            try {
+              return new Date(value).toLocaleString();
+            } catch (e) {
+              return value;
+            }
+          }
+          
+          // Format numbers
+          if (typeof value === 'number') {
+            return value.toFixed(field === 'electrical_conductivity' ? 4 : 2);
+          }
+          
+          return value !== undefined && value !== null ? value : '';
+        });
+        
+        csvData.push(row);
+      });
+      
+      return csvData;
+    }
     
-    // Data rows
-    data.parameters.forEach((param: any) => {
-      csvData.push([
-        param.name,
-        param.unit,
-        param.ideal_min,
-        param.ideal_max,
-        param.average,
-        param.min,
-        param.max,
-        param.rating,
-        param.cec || ""
-      ]);
-    });
-    
-    return csvData;
+    return [["No data available"]];
   }
 
   const handleDownload = () => {
@@ -313,7 +380,12 @@ export default function GenerateReportPage() {
       'device_id',
       'UpdatedAt',
       'DeletedAt',
-      'DeviceId'
+      'DeviceId',
+      'created_at',
+      'CreatedAt',
+      'id',
+      'ID',
+      '_id'
     ];
     
     // Create a comprehensive set of all fields present in any log
@@ -332,8 +404,7 @@ export default function GenerateReportPage() {
     
     // Prioritize important fields in a specific order
     const priorityFields = [
-      'created_at',              // Timestamp (keep this for time ordering)
-      'timestamp',               // Alternative timestamp field
+      'timestamp',               // Timestamp field
       'serial_number',           // Device ID
       'electrical_conductivity', // EC (primary field)
       'ec',                      // EC (alias)
@@ -356,10 +427,8 @@ export default function GenerateReportPage() {
       !excludedFields.includes(field.toLowerCase())
     );
     
-    // Find timestamp field - prefer 'created_at', fallback to 'timestamp'
-    const timestampField = 
-      filteredFields.includes('created_at') ? 'created_at' : 
-      filteredFields.includes('timestamp') ? 'timestamp' : null;
+    // Find timestamp field - use 'timestamp' if available
+    const timestampField = filteredFields.includes('timestamp') ? 'timestamp' : null;
     
     // Create ordered field list with timestamp first if available
     let orderedFields = [];
@@ -397,18 +466,16 @@ export default function GenerateReportPage() {
       const row = orderedFields.map(field => {
         const value = log[field];
         
-        // Format date fields for readability
-        if ((field === 'created_at' || field === 'timestamp') && value) {
+        // Format dates
+        if (field === 'timestamp' && value) {
           try {
-            const date = new Date(value);
-            return date.toLocaleString();
+            return new Date(value).toLocaleString();
           } catch (e) {
-            console.warn(`Error formatting date: ${value}`, e);
             return value;
           }
         }
         
-        // Format numerical fields with proper precision
+        // Format numbers
         if (typeof value === 'number') {
           // Use 4 decimal places for EC values for higher precision
           if (field === 'ec' || field === 'electrical_conductivity') {

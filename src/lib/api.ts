@@ -1,4 +1,4 @@
-import type { Device, FieldBoundary, Report, ReportData, Notification, User, Farm } from "@/types"
+import type { Device, FieldBoundary, Report, ReportData, Notification, User, Farm, BasicSoilAnalysisReport } from "@/types"
 import type { SoilReading } from "@/types/field-eyes"
 import { getToken } from "@/lib/auth"
 
@@ -96,74 +96,71 @@ export async function generateReport(
   timeRange: string,
   options: any,
 ): Promise<ReportData> {
-  if (reportType === "comprehensive") {
-    try {
-      // First get the basic soil analysis data
-      const token = getToken();
-      const basicAnalysisResponse = await fetch(`${API_URL}/reports/basic-soil-analysis`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": token ? `Bearer ${token}` : "",
-        },
-        body: JSON.stringify({
-          serial_number: deviceId,
-          start_date: options.startDate,
-          end_date: options.endDate,
-        }),
-      });
+  try {
+    // Get device logs for CSV format
+    if (options.format === "csv") {
+      console.log("Fetching device logs for CSV export:", deviceId, options.startDate, options.endDate);
+      const queryParams = new URLSearchParams({
+        serial_number: deviceId,
+        start_date: options.startDate,
+        end_date: options.endDate
+      }).toString();
       
-      if (!basicAnalysisResponse.ok) {
-        throw new Error(`Failed to get basic soil analysis: ${basicAnalysisResponse.statusText}`);
-      }
+      const logs = await fetchAPI<any[]>(`/get-device-logs?${queryParams}`);
       
-      const basicAnalysisData = await basicAnalysisResponse.json();
-      
-      // Then get additional crop recommendations based on the soil data
-      const cropRecommendationsResponse = await fetch(`${API_URL}/reports/crop-recommendations`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": token ? `Bearer ${token}` : "",
-        },
-        body: JSON.stringify({
-          serial_number: deviceId,
-          soil_data: basicAnalysisData.parameters,
-        }),
-      });
-      
-      if (!cropRecommendationsResponse.ok) {
-        // If crop recommendations fail, we can still return the basic analysis
-        console.warn("Failed to get crop recommendations, continuing with basic data only");
-      } else {
-        const cropData = await cropRecommendationsResponse.json();
-        
-        // Transform basic soil data and crop recommendations into a comprehensive report
-        return transformToComprehensiveReport(basicAnalysisData, cropData);
-      }
-      
-      // If we don't have crop data, just transform the basic data
-      return transformToComprehensiveReport(basicAnalysisData);
-    } catch (error) {
-      console.error("Error generating comprehensive report:", error);
-      throw error;
+      console.log("Received logs for CSV:", logs);
+      return {
+        device_name: deviceId,
+        parameters: logs,
+        generated_at: new Date().toISOString(),
+        start_date: options.startDate,
+        end_date: options.endDate,
+        // Add required fields from BasicSoilAnalysisReport
+        date: new Date().toLocaleDateString(),
+        deviceName: deviceId,
+        deviceId: deviceId,
+        farmName: "Your Farm"
+      } as BasicSoilAnalysisReport;
     }
+
+    // Get basic soil analysis data for PDF reports
+    const basicAnalysisData = await fetchAPI<ReportData>("/reports/basic-soil-analysis", {
+      method: "POST",
+      body: JSON.stringify({
+        serial_number: deviceId,
+        start_date: options.startDate,
+        end_date: options.endDate,
+      }),
+    });
+
+    // For basic report, return the data as is
+    if (reportType === "basic") {
+      return basicAnalysisData;
+    }
+
+    // For comprehensive report, transform the basic data
+    if (reportType === "comprehensive") {
+      return transformToComprehensiveReport(basicAnalysisData);
+    }
+    
+    // For other report types, use the existing API
+    return fetchAPI<ReportData>("/reports/generate", {
+      method: "POST",
+      body: JSON.stringify({
+        serial_number: deviceId,
+        type: reportType,
+        time_range: timeRange,
+        ...options,
+      }),
+    });
+  } catch (error) {
+    console.error("Error generating report:", error);
+    throw error;
   }
-  
-  // For other report types, use the existing API
-  return fetchAPI<ReportData>("/reports/generate", {
-    method: "POST",
-    body: JSON.stringify({
-      serial_number: deviceId,
-      type: reportType,
-      time_range: timeRange,
-      ...options,
-    }),
-  });
 }
 
 // Helper function to transform basic soil analysis and crop data into a comprehensive report
-function transformToComprehensiveReport(basicData: any, cropData?: any): ReportData {
+function transformToComprehensiveReport(basicData: any): ReportData {
   // Get current date in readable format
   const currentDate = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
@@ -195,14 +192,11 @@ function transformToComprehensiveReport(basicData: any, cropData?: any): ReportD
     keyFindings.unshift(`Overall soil health assessment indicates ${getOverallRating(basicData.parameters)} conditions.`);
   }
   
-  // Create default crop recommendations if none provided
-  const cropRecommendations = cropData?.crops || generateDefaultCropRecommendations(basicData.parameters);
+  // Generate crop recommendations based on soil parameters
+  const cropRecommendations = generateDefaultCropRecommendations(basicData.parameters);
   
-  // Create treatment recommendations based on soil parameters
+  // Generate treatment recommendations based on soil parameters
   const treatmentRecommendations = generateTreatmentRecommendations(basicData.parameters);
-  
-  // Create seasonal plan
-  const seasonalPlan = generateSeasonalPlan(basicData.parameters, cropRecommendations);
   
   // Compile the comprehensive report
   return {
@@ -215,7 +209,7 @@ function transformToComprehensiveReport(basicData: any, cropData?: any): ReportD
     soilIndicators,
     cropRecommendations,
     treatmentRecommendations,
-    seasonalPlan
+    seasonalPlan: [] // Return empty array instead of generating seasonal plan
   };
 }
 
@@ -473,66 +467,6 @@ function generateTreatmentRecommendations(parameters: any[]): any[] {
   }
   
   return treatments;
-}
-
-function generateSeasonalPlan(parameters: any[], cropRecommendations: any[]): any[] {
-  // Create a basic seasonal plan based on common agricultural practices
-  return [
-    {
-      month: "January-February",
-      activities: [
-        "Soil testing and analysis",
-        "Plan crop rotation and varieties based on soil test results",
-        "Order seeds and amendments",
-        "Implement pH correction treatments if needed"
-      ]
-    },
-    {
-      month: "March-April",
-      activities: [
-        "Apply pre-planting fertilizers based on soil analysis",
-        "Prepare seedbeds and equipment",
-        "Early planting of cool-season crops",
-        "Monitor soil moisture and temperature"
-      ]
-    },
-    {
-      month: "May-June",
-      activities: [
-        "Main planting season for warm-season crops",
-        "Install irrigation systems if needed",
-        "Apply early-season weed control",
-        "Monitor for pest and disease pressure"
-      ]
-    },
-    {
-      month: "July-August",
-      activities: [
-        "Apply side-dress fertilization as needed",
-        "Regular irrigation management",
-        "Continued pest and disease monitoring",
-        "Prepare for early harvests"
-      ]
-    },
-    {
-      month: "September-October",
-      activities: [
-        "Main harvest season for many crops",
-        "Collect yield data and evaluate performance",
-        "Plant cover crops in harvested fields",
-        "Begin soil preparation for next season"
-      ]
-    },
-    {
-      month: "November-December",
-      activities: [
-        "Complete harvest operations",
-        "Apply fall soil amendments",
-        "Implement winter cover crop strategies",
-        "Evaluate yearly performance and plan for next season"
-      ]
-    }
-  ];
 }
 
 // Notifications API functions

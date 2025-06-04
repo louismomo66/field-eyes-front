@@ -47,7 +47,7 @@ export interface Report {
 export interface SoilIndicator {
   name: string
   value: string
-  rating: "Excellent" | "Good" | "Fair" | "Poor"
+  rating: string
   ideal: string
   explanation: string
 }
@@ -79,8 +79,35 @@ export interface SeasonalActivity {
 }
 
 // Report Data Types
-export interface DetailedReportData {
-  id: string
+export interface Parameter {
+  name: string
+  unit: string
+  ideal_min: number
+  ideal_max: number
+  average: number
+  min: number
+  max: number
+  rating: string
+  cec?: number
+}
+
+export interface BasicSoilAnalysisReport {
+  device_name: string
+  parameters: Parameter[]
+  generated_at: string
+  start_date: string
+  end_date: string
+  // Add fields that might be needed for report preview
+  date?: string
+  farmName?: string
+  deviceName?: string
+  deviceId?: string
+  overallHealth?: string
+  keyFindings?: string[]
+  soilIndicators?: SoilIndicator[]
+}
+
+export interface ComprehensiveReport {
   date: string
   farmName: string
   deviceName: string
@@ -92,6 +119,19 @@ export interface DetailedReportData {
   treatmentRecommendations: TreatmentRecommendation[]
   seasonalPlan: SeasonalActivity[]
 }
+
+export interface CropReport {
+  date: string
+  farmName: string
+  deviceName: string
+  deviceId: string
+  overallHealth: string
+  keyFindings: string[]
+  soilIndicators: SoilIndicator[]
+  cropRecommendations: CropRecommendation[]
+}
+
+export type ReportData = BasicSoilAnalysisReport | ComprehensiveReport | CropReport
 
 // Notification Types
 export interface Notification {
@@ -125,33 +165,3 @@ export interface Farm {
   primaryCrops: string[]
   description?: string
 }
-
-export interface Parameter {
-  name: string
-  unit: string
-  ideal_min: number
-  ideal_max: number
-  average: number
-  min: number
-  max: number
-  rating: string
-  cec?: number
-}
-
-export interface BasicSoilAnalysisReport {
-  device_name: string
-  parameters: Parameter[]
-  generated_at: string
-  start_date: string
-  end_date: string
-}
-
-export interface ComprehensiveReport {
-  // Add comprehensive report fields when needed
-}
-
-export interface CropReport {
-  // Add crop report fields when needed
-}
-
-export type ReportData = BasicSoilAnalysisReport | ComprehensiveReport | CropReport
