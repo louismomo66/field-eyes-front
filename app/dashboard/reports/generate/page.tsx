@@ -135,36 +135,21 @@ export default function GenerateReportPage() {
       return
     }
 
+    // Validate date range
+    const now = new Date()
+    if (startDate > now || endDate > now) {
+      setError("Date range cannot be in the future")
+      return
+    }
+
     try {
       setIsGenerating(true)
       setError(null)
 
-      // Verify device exists first
-      let device;
-      try {
-        device = await getDevice(selectedDevices[0]);
-        console.log("Found device:", device);
-      } catch (err) {
-        // Try to register and claim the device
-        try {
-          console.log("Device not found, attempting to register...");
-          await registerDevice({
-            device_type: "soil_sensor",
-            serial_number: selectedDevices[0]
-          });
-          
-          console.log("Device registered, attempting to claim...");
-          await claimDevice(selectedDevices[0], `Soil Sensor ${selectedDevices[0]}`);
-          
-          // Try to get the device again
-          device = await getDevice(selectedDevices[0]);
-          console.log("Device successfully registered and claimed:", device);
-        } catch (regErr) {
-          console.error("Error registering device:", regErr);
-          setError("Failed to register device. Please verify the device serial number and try again.");
-          setIsGenerating(false);
-          return;
-        }
+      // Get the auth token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error("Not authenticated. Please log in again.");
       }
 
       // Prepare options for report generation
@@ -193,44 +178,61 @@ export default function GenerateReportPage() {
         const csvData = convertDeviceLogsToCsv((data as BasicSoilAnalysisReport).parameters, (data as BasicSoilAnalysisReport).device_name);
         setCsvData(csvData);
       } else if (reportType === "basic") {
-        // Get the auth token from localStorage
-        const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error("Not authenticated. Please log in again.");
-        }
-
         console.log("Generating basic soil analysis report with params:", {
           serial_number: selectedDevices[0],
           start_date: startDate.toISOString(),
           end_date: endDate.toISOString()
         });
 
-        // Call the basic soil analysis endpoint
-        const response = await fetch("http://localhost:9002/api/reports/basic-soil-analysis", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            serial_number: selectedDevices[0],
-            start_date: startDate.toISOString(),
-            end_date: endDate.toISOString(),
-          }),
-        });
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error("Report generation failed:", {
-            status: response.status,
-            statusText: response.statusText,
-            error: errorText
+        try {
+          // Use the field-eyes-api utility function
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:9002/api'}/reports/basic-soil-analysis`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              serial_number: selectedDevices[0],
+              start_date: startDate.toISOString(),
+              end_date: endDate.toISOString(),
+            }),
           });
-          throw new Error(`Failed to generate report: ${errorText}`);
+
+          let errorData;
+          if (!response.ok) {
+            const errorText = await response.text();
+            try {
+              errorData = JSON.parse(errorText);
+            } catch (e) {
+              errorData = { message: errorText };
+            }
+
+            console.error("Report generation failed:", {
+              status: response.status,
+              statusText: response.statusText,
+              error: errorData
+            });
+
+            // Handle specific error cases
+            if (errorData.message?.includes("no data available")) {
+              throw new Error("No data available for the selected period. Please try a different date range.");
+            } else if (errorData.message?.includes("device not found")) {
+              throw new Error("Device not found. Please verify the device is properly registered.");
+            } else {
+              throw new Error(errorData.message || "Failed to generate report");
+            }
+          }
+          
+          data = await response.json();
+          if (!data) {
+            throw new Error("No report data received");
+          }
+          setReportData(data);
+        } catch (error) {
+          console.error("Error in basic report generation:", error);
+          throw error; // Re-throw to be caught by outer catch block
         }
-        
-        data = await response.json();
-        setReportData(data);
       } else {
         // Generate report using existing API for other report types
         data = await generateReport(
@@ -246,7 +248,11 @@ export default function GenerateReportPage() {
       setIsGenerating(false)
     } catch (err) {
       console.error("Error generating report:", err)
-      setError("Failed to generate report")
+      if (err instanceof Error) {
+        setError(err.message)
+      } else {
+        setError("Failed to generate report. Please try again.")
+      }
       setIsGenerating(false)
     }
   }

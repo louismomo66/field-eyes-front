@@ -11,6 +11,15 @@ const nextConfig = {
   },
   images: {
     domains: ['field-eyes.com', 'api.field-eyes.com'],
+    unoptimized: process.env.NODE_ENV === 'development',
+    remotePatterns: [
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '3000',
+        pathname: '/app/**',
+      },
+    ],
   },
 }
 
