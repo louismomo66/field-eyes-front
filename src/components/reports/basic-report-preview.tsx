@@ -7,6 +7,22 @@ interface BasicReportPreviewProps {
   type: "basic";
 }
 
+const getUnitDisplay = (unit: string) => {
+  switch (unit.toLowerCase()) {
+    case 'ph':
+      return '';
+    case '%':
+      return '%';
+    case 'mg/kg':
+      return ' mg/kg';
+    case 'µs/cm':
+    case 'us/cm':
+      return ' µS/cm';
+    default:
+      return ` ${unit}`;
+  }
+};
+
 export function BasicReportPreview({ reportData, type }: BasicReportPreviewProps) {
   if (!reportData) {
     return (
@@ -52,7 +68,7 @@ export function BasicReportPreview({ reportData, type }: BasicReportPreviewProps
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">Average Value</p>
-                  <p>{param.average} {param.unit}</p>
+                  <p>{param.average} {getUnitDisplay(param.unit)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Rating</p>
@@ -60,11 +76,11 @@ export function BasicReportPreview({ reportData, type }: BasicReportPreviewProps
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Range</p>
-                  <p>{param.min} - {param.max} {param.unit}</p>
+                  <p>{param.min} - {param.max} {getUnitDisplay(param.unit)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Ideal Range</p>
-                  <p>{param.ideal_min} - {param.ideal_max} {param.unit}</p>
+                  <p>{param.ideal_min} - {param.ideal_max} {getUnitDisplay(param.unit)}</p>
                 </div>
               </div>
             </div>

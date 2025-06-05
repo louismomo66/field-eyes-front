@@ -130,7 +130,7 @@ export function SoilHealthIndicator({ device, readings = [] }: SoilHealthIndicat
     const nitrogenScore = convertToScore(avgNitrogen, 10, 20, 100);
     const phosphorusScore = convertToScore(avgPhosphorus, 5, 15, 100);
     const potassiumScore = convertToScore(avgPotassium, 5, 15, 100);
-    const ecScore = convertToScore(avgEc, 0.8, 1.5, 100);
+    const ecScore = convertToScore(avgEc, 200, 800, 100);
 
     // Organic matter - use a value based on the other indicators as a rough estimate
     // This is a simplified approach since organic matter is not directly measured
@@ -191,22 +191,33 @@ export function SoilHealthIndicator({ device, readings = [] }: SoilHealthIndicat
   // Helper function to convert a value to a score (0-100)
   const convertToScore = (value: number, min: number, max: number, optimalScore: number) => {
     if (!value && value !== 0) {
-      return Math.round(optimalScore * 0.7); // Default score for missing data
+        return Math.round(optimalScore * 0.7); // Default score for missing data
+    }
+
+    // Special handling for EC which is now in µS/cm
+    if (min === 200 && max === 800) { // EC thresholds
+        if (value < min) {
+            return Math.round(Math.max(10, (value / min) * (optimalScore * 0.7)));
+        } else if (value > max) {
+            const excess = value - max;
+            const range = max - min;
+            return Math.round(Math.max(10, optimalScore - (excess / range) * (optimalScore * 0.5)));
+        } else {
+            const position = (value - min) / (max - min);
+            return Math.round(optimalScore * (0.8 + 0.2 * (1 - Math.abs(position - 0.5) * 2)));
+        }
     }
     
+    // Regular handling for other parameters
     if (value < min) {
-      // Below optimal range - score decreases as value decreases
-      return Math.round(Math.max(10, (value / min) * (optimalScore * 0.7)));
+        return Math.round(Math.max(10, (value / min) * (optimalScore * 0.7)));
     } else if (value > max) {
-      // Above optimal range - score decreases as value increases
-      const excess = value - max;
-      const range = max - min;
-      return Math.round(Math.max(10, optimalScore - (excess / range) * (optimalScore * 0.5)));
+        const excess = value - max;
+        const range = max - min;
+        return Math.round(Math.max(10, optimalScore - (excess / range) * (optimalScore * 0.5)));
     } else {
-      // Within optimal range - score is highest
-      const position = (value - min) / (max - min);
-      // Score peaks in the middle of the range
-      return Math.round(optimalScore * (0.8 + 0.2 * (1 - Math.abs(position - 0.5) * 2)));
+        const position = (value - min) / (max - min);
+        return Math.round(optimalScore * (0.8 + 0.2 * (1 - Math.abs(position - 0.5) * 2)));
     }
   }
 
