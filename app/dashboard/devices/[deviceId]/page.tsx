@@ -29,13 +29,16 @@ import {
   ClipboardList,
   RefreshCw,
 } from "lucide-react"
-import { getLatestDeviceLog, getDeviceLogs, getUserDevices } from "@/lib/field-eyes-api"
+import { getLatestDeviceLog, getDeviceLogs, getUserDevices, updateDeviceName } from "@/lib/field-eyes-api"
 import { transformSoilReading } from "@/lib/transformers"
 import { SoilReading } from "@/types/field-eyes"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { ParameterTrends } from "@/components/dashboard/parameter-trends"
 import React from 'react'
 import { NotificationCenter } from "@/components/dashboard/notification-center"
+import { Input } from "@/components/ui/input"
+import { useToast } from "@/components/ui/use-toast"
+import { Device } from "@/types/field-eyes"
 
 // Donut chart component for visualizing readings
 interface DonutChartProps {
@@ -1349,11 +1352,11 @@ const ReadingsGrid = memo(
 ReadingsGrid.displayName = 'ReadingsGrid';
 
 // Define required types
-type DeviceInfo = {
-  id: string;
+interface DeviceInfo extends Omit<Device, 'name' | 'status'> {
+  status: "active" | "warning" | "offline";
   name: string;
-  status: string;
-};
+  serial_number: string;
+}
 
 type DeviceAlertItem = {
   type: string;
@@ -1374,6 +1377,9 @@ export default function DeviceDetailsPage() {
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null)
   const [readings, setReadings] = useState<ReadingsData | null>(null)
   const [deviceAlerts, setDeviceAlerts] = useState<DeviceAlertItem[]>([])
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [newName, setNewName] = useState("")
+  const { toast } = useToast()
   
   // Use refs to minimize re-renders
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -1449,6 +1455,16 @@ export default function DeviceDetailsPage() {
         }
       }
       
+      // Update device info with proper typing
+      if (deviceDetails) {
+        setDeviceInfo({
+          ...deviceDetails,
+          status: "active", // or determine based on your logic
+          name: deviceDetails.name || `Device ${deviceId}`,
+          serial_number: deviceId
+        });
+      }
+      
       // Fetch the latest reading for this device
       let latestReading;
       let transformedReading;
@@ -1493,41 +1509,6 @@ export default function DeviceDetailsPage() {
       if (alertsChanged) {
         // Use functional update to ensure we're working with the latest state
         setDeviceAlerts(prev => calculatedAlerts);
-      }
-      
-      // Update basic device info if it's first load or status has changed
-      if (!deviceInfo || deviceInfo.status !== status) {
-        // Special handling for device 9565985947890
-        let deviceName = deviceDetails?.name || `Sensor ${deviceId}`;
-        
-        // If this is the specific device, check if we have a stored custom name
-        if (deviceId === "9565985947890" && typeof window !== 'undefined') {
-          const storedName = window.localStorage.getItem('custom_name_9565985947890');
-          if (storedName) {
-            deviceName = storedName;
-            console.log(`Using stored custom name for device 9565985947890: "${storedName}"`);
-          } else {
-            // If no stored name yet, use the device details name or create a prompt to enter one
-            const hasPrompted = window.localStorage.getItem('prompted_for_name_9565985947890');
-            if (!hasPrompted) {
-              setTimeout(() => {
-                const customName = window.prompt("What would you like to name your device?", "My Field Sensor");
-                if (customName) {
-                  window.localStorage.setItem('custom_name_9565985947890', customName);
-                  // Refresh the page to show the new name
-                  window.location.reload();
-                }
-                window.localStorage.setItem('prompted_for_name_9565985947890', 'true');
-              }, 1000);
-            }
-          }
-        }
-        
-        setDeviceInfo({
-          id: deviceId,
-          name: deviceName,
-          status,
-        })
       }
       
       // Create readings object with default values of 0 for readings if not available
@@ -1785,6 +1766,39 @@ export default function DeviceDetailsPage() {
     )
   }
 
+  // Add name editing functionality
+  const handleEditName = () => {
+    setNewName(deviceInfo?.name || "")
+    setIsEditingName(true)
+  }
+
+  const handleSaveName = async () => {
+    if (!deviceInfo?.serial_number) return
+
+    try {
+      const result = await updateDeviceName(deviceInfo.serial_number, newName)
+      setDeviceInfo(prev => prev ? { ...prev, name: result.name } : null)
+      setIsEditingName(false)
+      
+      toast({
+        title: "Success",
+        description: "Device name updated successfully",
+      })
+    } catch (err) {
+      console.error("Error updating device name:", err)
+      toast({
+        title: "Error",
+        description: "Failed to update device name",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditingName(false)
+    setNewName("")
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 bg-white min-h-screen">
       {/* Enhanced header with device info and status */}
@@ -1794,7 +1808,32 @@ export default function DeviceDetailsPage() {
           Back
         </Button>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold">{deviceInfo.name}</h1>
+          {isEditingName ? (
+            <div className="flex items-center gap-2">
+              <Input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Enter device name"
+                className="max-w-[200px]"
+              />
+              <Button onClick={handleSaveName} className="bg-green-600 hover:bg-green-700">
+                Save
+              </Button>
+              <Button variant="outline" onClick={handleCancelEdit}>
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold">{deviceInfo.name}</h1>
+              <Button variant="ghost" size="sm" onClick={handleEditName} className="h-8 w-8 p-0">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+              </Button>
+            </div>
+          )}
           <div className="flex items-center text-sm text-gray-500">
             <Badge className={
               deviceInfo.status === "active" ? "bg-green-500" : "bg-red-500"
@@ -1802,7 +1841,7 @@ export default function DeviceDetailsPage() {
               {deviceInfo.status === "active" ? "Active" : "Offline"}
             </Badge>
           </div>
-    </div>
+        </div>
         <Button 
           variant="outline" 
           className="bg-white hover:bg-gray-50 border-green-600 text-green-600 hover:text-green-700 flex items-center"

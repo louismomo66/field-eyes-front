@@ -8,8 +8,8 @@ export interface Device {
     user_id: number
     created_at: string
     updated_at: string
+    name: string | null
     // UI fields (these will need to be derived/transformed)
-    name?: string
     status?: "active" | "warning" | "offline"
     battery?: number
     signal?: string

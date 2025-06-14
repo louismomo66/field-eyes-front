@@ -7,10 +7,11 @@ export function transformDevice(device: Device): Device {
   // Create a copy of the device
   const uiDevice = { ...device };
   
-  // Set some UI friendly values - use device.name if it exists, otherwise use default
-  if (!uiDevice.name) {
-    uiDevice.name = `Device ${device.serial_number}`;
-  }
+  // Set some UI friendly values
+  // Use device.name if it exists, otherwise create a default name
+  uiDevice.name = device.name || `Field Sensor ${device.serial_number}`;
+  
+  // Set other UI values
   uiDevice.status = "active"; // Default to active
   uiDevice.lastReading = new Date(device.updated_at).toLocaleString();
   uiDevice.battery = 85; // Mocked value

@@ -263,4 +263,16 @@ import {
       method: "DELETE",
       body: JSON.stringify({ id }),
     })
+  }
+  
+  export async function updateDeviceName(serialNumber: string, name: string): Promise<{ message: string; device_id: string; serial_number: string; name: string }> {
+    console.log(`Updating name for device ${serialNumber} to "${name}"`);
+    
+    return fetchAPI<{ message: string; device_id: string; serial_number: string; name: string }>("/update-device-name", {
+      method: "PUT",
+      body: JSON.stringify({
+        serial_number: serialNumber,
+        name: name
+      }),
+    })
   } 
