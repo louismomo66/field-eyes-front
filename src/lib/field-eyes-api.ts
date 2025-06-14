@@ -9,7 +9,7 @@ import {
     MessageResponse,
     AnalysisResult
   } from "../types/field-eyes"
-  import { getToken, setToken, removeToken } from "@/lib/auth"
+  import { getToken, setToken, removeToken, handleTokenExpiration } from "@/lib/auth"
   
   // Base API URL from environment variable
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:9002/api"
@@ -53,16 +53,14 @@ import {
         
         // Handle unauthorized errors specifically (401)
         if (response.status === 401) {
-          // Clear the auth token
-          removeToken()
-          
-          // Dispatch a custom auth error event that can be caught by layout components
-          if (typeof window !== 'undefined') {
-            const authErrorEvent = new CustomEvent('auth_error', { 
-              detail: { message: 'unauthorized: invalid or missing token' } 
-            });
-            window.dispatchEvent(authErrorEvent);
-          }
+          // Handle token expiration
+          handleTokenExpiration()
+          throw new APIError(
+            'Session expired. Please log in again.',
+            response.status,
+            response.statusText,
+            errorData
+          )
         }
         
         // Create a proper error object with all relevant information

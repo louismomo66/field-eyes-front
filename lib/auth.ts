@@ -74,4 +74,14 @@ const deleteCookie = (name: string): void => {
 // Function to check if we're on the client side
 export const isClient = (): boolean => {
   return typeof window !== 'undefined'
+}
+
+export const handleTokenExpiration = (): void => {
+  if (typeof window === 'undefined') return
+  
+  // Remove the expired token
+  removeToken()
+  
+  // Redirect to login page
+  window.location.href = 'https://field-eyes.com/app/login'
 } 
