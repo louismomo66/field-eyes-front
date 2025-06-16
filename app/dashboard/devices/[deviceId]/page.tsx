@@ -39,6 +39,7 @@ import { NotificationCenter } from "@/components/dashboard/notification-center"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
 import { Device } from "@/types/field-eyes"
+import { cn } from "@/lib/utils"
 
 // Donut chart component for visualizing readings
 interface DonutChartProps {
@@ -1477,8 +1478,22 @@ export default function DeviceDetailsPage() {
         
         // Determine device status based on latest reading timestamp
         const now = new Date()
-        readingTime = new Date(transformedReading.created_at || transformedReading.timestamp || '')
+        // Use the correct timestamp field from the API response
+        // The API response may have different field names than our interface
+        const apiResponse = latestReading as any
+        const timestampToUse = apiResponse.created_at || apiResponse.CreatedAt || transformedReading.created_at || transformedReading.timestamp || ''
+        readingTime = new Date(timestampToUse)
         diffMins = Math.floor((now.getTime() - readingTime.getTime()) / 60000)
+        
+        console.log("Device status debug:", {
+          deviceId,
+          timestampToUse,
+          readingTime: readingTime.toISOString(),
+          now: now.toISOString(),
+          diffMins,
+          latestReading_created_at: apiResponse.created_at,
+          latestReading_CreatedAt: apiResponse.CreatedAt
+        })
       } catch (err) {
         console.log("No readings found for this device or device is inactive")
         // Create an empty reading object for inactive devices
@@ -1835,9 +1850,14 @@ export default function DeviceDetailsPage() {
             </div>
           )}
           <div className="flex items-center text-sm text-gray-500">
-            <Badge className={
-              deviceInfo.status === "active" ? "bg-green-500" : "bg-red-500"
-            }>
+            <Badge 
+              variant="status"
+              className={cn(
+                deviceInfo.status === "active" 
+                  ? "bg-green-500" 
+                  : "bg-red-500"
+              )}
+            >
               {deviceInfo.status === "active" ? "Active" : "Offline"}
             </Badge>
           </div>

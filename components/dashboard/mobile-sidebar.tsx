@@ -1,6 +1,6 @@
 import { useState } from "react";
 import Link from "next/link";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Home, Cpu, FileText, Settings, Menu, X, LogOut } from "lucide-react";
 
@@ -64,6 +64,7 @@ export function MobileSidebar({ currentPath, className }: MobileSidebarProps) {
           boxShadow: '2px 0 15px rgba(0,0,0,0.15)',
         }}
       >
+        <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
         <div className="flex h-20 items-center justify-between border-b border-white/10 px-6" style={{
           background: 'rgba(255,255,255,0.15)',
           backdropFilter: 'blur(5px)',
