@@ -96,10 +96,10 @@ export function SoilHealthIndicator({ device, readings = [] }: SoilHealthIndicat
       moisture: 50,
       temperature: 20,
       ph: 6.5,
-      nitrogen: 15,
-      phosphorus: 10,
-      potassium: 10,
-      ec: 1.0,
+      nitrogen: 37, // mg/kg - middle of optimal range (25-50)
+      phosphorus: 40, // mg/kg - middle of optimal range (30-50)
+      potassium: 140, // mg/kg - middle of optimal range (100-180)
+      ec: 0.7, // mS/cm - will be converted to 700 µS/cm, middle of optimal range (200-1200)
     };
 
     // Calculate averages with fallbacks to ensure we always have some values
@@ -133,7 +133,8 @@ export function SoilHealthIndicator({ device, readings = [] }: SoilHealthIndicat
     const phosphorusScore = convertToScore(avgPhosphorus, 30, 50, 100);
     // Potassium: Optimal 100-180 mg/kg
     const potassiumScore = convertToScore(avgPotassium, 100, 180, 100);
-    const ecScore = convertToScore(avgEc, 200, 800, 100);
+    // EC: Convert to µS/cm and use optimal range 200-1200 µS/cm (good nutrient balance)
+    const ecScore = convertToScore(avgEc * 1000, 200, 1200, 100);
 
     // Organic matter - use a value based on the other indicators as a rough estimate
     // This is a simplified approach since organic matter is not directly measured
@@ -197,8 +198,8 @@ export function SoilHealthIndicator({ device, readings = [] }: SoilHealthIndicat
         return Math.round(optimalScore * 0.7); // Default score for missing data
     }
 
-    // Special handling for EC which is now in µS/cm
-    if (min === 200 && max === 800) { // EC thresholds
+    // Special handling for EC which is in µS/cm
+    if (min === 200 && max === 1200) { // EC thresholds
         if (value < min) {
             return Math.round(Math.max(10, (value / min) * (optimalScore * 0.7)));
         } else if (value > max) {

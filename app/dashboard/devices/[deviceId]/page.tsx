@@ -1015,6 +1015,20 @@ const ReadingsGrid = memo(
       if (ph > 7.5) return { text: 'Alkaline', color: 'text-blue-700 bg-blue-100' }
       return { text: 'Neutral', color: 'text-green-500 bg-green-100' }
     }
+
+    const getECLevel = (value: number) => {
+      // EC thresholds in µS/cm: Low < 200, Optimal 200-1200, High > 1200
+      if (value < 200) return 'Low'
+      if (value > 1200) return 'High'
+      return 'Optimal'
+    }
+
+    const getECColor = (value: number) => {
+      // EC thresholds in µS/cm: Low < 200, Optimal 200-1200, High > 1200
+      if (value < 200) return 'text-red-500'
+      if (value > 1200) return 'text-amber-500'
+      return 'text-green-500'
+    }
     
     return (
       <div className="space-y-6">
@@ -1211,8 +1225,8 @@ const ReadingsGrid = memo(
                           <span className="h-2 w-2 rounded-full bg-blue-500 mr-1.5"></span>
                           Electrical Conductivity
                         </span>
-                        <span className="text-xs text-blue-500">
-                          {readings.ec.value} mS/cm
+                        <span className={`text-xs ${getECColor(readings.ec.value * 1000)}`}>
+                          {(readings.ec.value * 1000).toFixed(0)} µS/cm - {getECLevel(readings.ec.value * 1000)}
                         </span>
                       </div>
                       <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
@@ -1741,13 +1755,13 @@ export default function DeviceDetailsPage() {
       })
     }
     
-    // Check electrical conductivity
+    // Check electrical conductivity (convert to µS/cm for thresholds)
     if ((reading.ec !== undefined || reading.electrical_conductivity !== undefined) && 
-        ((reading.ec !== undefined && reading.ec > 1.5) || 
-         (reading.electrical_conductivity !== undefined && reading.electrical_conductivity > 1.5))) {
+        ((reading.ec !== undefined && reading.ec * 1000 > 1200) || 
+         (reading.electrical_conductivity !== undefined && reading.electrical_conductivity * 1000 > 1200))) {
       alerts.push({
         type: "warning",
-        message: `High Electrical Conductivity (${reading.ec || reading.electrical_conductivity} mS/cm)`,
+        message: `High Electrical Conductivity (${((reading.ec || reading.electrical_conductivity) * 1000).toFixed(0)} µS/cm)`,
         time: formatDateTime(reading.created_at || reading.timestamp || ''),
         icon: Zap,
       })

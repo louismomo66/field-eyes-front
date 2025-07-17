@@ -113,7 +113,7 @@ export function DeviceInfoPanel({ deviceId }: DeviceInfoPanelProps) {
               <Zap className="mr-1 h-4 w-4" />
               EC
             </div>
-            <span>{deviceData.ec} mS/cm</span>
+                            <span>{deviceData.ec ? (deviceData.ec * 1000).toFixed(0) : '0'} µS/cm</span>
           </div>
           <Progress value={(deviceData.ec || 0) * 50} className="h-2" />
         </div>

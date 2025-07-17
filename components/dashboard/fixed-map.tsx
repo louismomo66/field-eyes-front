@@ -138,7 +138,7 @@ const FixedMap: React.FC<FixedMapProps> = ({ onDeviceSelect, onDeviceHover }) =>
           </div>
           <div class="metric-row">
             <span class="label">EC:</span>
-            <span class="value">${reading.electrical_conductivity ? `${reading.electrical_conductivity.toFixed(2)} mS/cm` : 'N/A'}</span>
+                          <span class="value">${reading.electrical_conductivity ? `${(reading.electrical_conductivity * 1000).toFixed(0)} µS/cm` : 'N/A'}</span>
           </div>
           <div class="metric-row">
             <span class="label">Nitrogen:</span>

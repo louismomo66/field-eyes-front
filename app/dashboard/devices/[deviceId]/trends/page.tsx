@@ -47,7 +47,7 @@ const parameterMeta: Record<string, ParamMeta> = {
       nitrogen: { name: "Nitrogen (N)", color: "#22c55e", unit: "mg/kg", min: 0, max: 100 },
     phosphorus: { name: "Phosphorus (P)", color: "#f97316", unit: "mg/kg", min: 0, max: 150 },
     potassium: { name: "Potassium (K)", color: "#eab308", unit: "mg/kg", min: 0, max: 300 },
-      ec: { name: "Electrical Conductivity", color: "#06b6d4", unit: "mS/cm", min: 0, max: 2 },
+      ec: { name: "Electrical Conductivity", color: "#06b6d4", unit: "µS/cm", min: 0, max: 2000 },
 }
 
 // Parameter data mapping - handles different property names in the API
@@ -447,7 +447,12 @@ export default function DeviceTrendsPage() {
       // Need to use type assertion since we're dynamically accessing properties
       const value = reading[field as keyof SoilReading];
       if (value !== undefined && value !== null) {
-        return Number(value);
+        const numValue = Number(value);
+        // Convert EC from mS/cm to µS/cm for display
+        if (paramKey === 'ec') {
+          return numValue * 1000;
+        }
+        return numValue;
       }
     }
     

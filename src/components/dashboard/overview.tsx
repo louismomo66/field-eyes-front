@@ -115,7 +115,8 @@ export function Overview() {
       moisture: group.count > 0 ? Number((group.moisture / group.count).toFixed(2)) : 0,
       temperature: group.count > 0 ? Number((group.temperature / group.count).toFixed(2)) : 0,
       ph: group.count > 0 ? Number((group.ph / group.count).toFixed(2)) : 0,
-      ec: group.count > 0 ? Number((group.ec / group.count).toFixed(2)) : 0,
+      // Convert EC from mS/cm to µS/cm for chart display
+      ec: group.count > 0 ? Number(((group.ec / group.count) * 1000).toFixed(0)) : 0,
     }))
   }
 
@@ -229,7 +230,7 @@ export function Overview() {
             yAxisId="right" 
             type="monotone" 
             dataKey="ec" 
-            name="EC (mS/cm)" 
+                            name="EC (µS/cm)" 
             stroke="#06b6d4" 
           />
         </LineChart>

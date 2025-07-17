@@ -287,12 +287,12 @@ export default function DashboardPage() {
     const avgMoisture = moistureCount > 0 ? Math.round(totalMoisture / moistureCount) : 0;
     const avgPh = phCount > 0 ? Number.parseFloat((totalPh / phCount).toFixed(1)) : 0;
     
-    // Count alerts
+    // Count alerts (convert EC to µS/cm for thresholds)
     const alertCount = weeklyReadings.filter(r => 
       (r.ph !== undefined && (r.ph < 5.5 || r.ph > 7.5)) ||
       (r.soil_moisture !== undefined && (r.soil_moisture < 30 || r.soil_moisture > 70)) ||
       (r.soil_temperature !== undefined && (r.soil_temperature < 15 || r.soil_temperature > 30)) ||
-      (r.electrical_conductivity !== undefined && (r.electrical_conductivity < 0.5 || r.electrical_conductivity > 1.5))
+      (r.electrical_conductivity !== undefined && (r.electrical_conductivity * 1000 < 200 || r.electrical_conductivity * 1000 > 1200))
     ).length;
     
     // Update dashboard stats
@@ -440,7 +440,7 @@ export default function DashboardPage() {
                 (r.ph !== undefined && (r.ph < 5.5 || r.ph > 7.5)) ||
                 (r.soil_moisture !== undefined && (r.soil_moisture < 30 || r.soil_moisture > 70)) ||
                 (r.soil_temperature !== undefined && (r.soil_temperature < 15 || r.soil_temperature > 30)) ||
-                (r.electrical_conductivity !== undefined && (r.electrical_conductivity < 0.5 || r.electrical_conductivity > 1.5))
+                (r.electrical_conductivity !== undefined && (r.electrical_conductivity * 1000 < 200 || r.electrical_conductivity * 1000 > 1200))
               ).length
               
               setDashboardStats({
@@ -500,12 +500,12 @@ export default function DashboardPage() {
     const avgMoisture = moistureCount > 0 ? Math.round(totalMoisture / moistureCount) : 0;
     const avgPh = phCount > 0 ? Number.parseFloat((totalPh / phCount).toFixed(1)) : 0;
     
-    // Count alerts
+    // Count alerts (convert EC to µS/cm for thresholds)
     const alertCount = weeklyReadings.filter(r => 
       (r.ph !== undefined && (r.ph < 5.5 || r.ph > 7.5)) ||
       (r.soil_moisture !== undefined && (r.soil_moisture < 30 || r.soil_moisture > 70)) ||
       (r.soil_temperature !== undefined && (r.soil_temperature < 15 || r.soil_temperature > 30)) ||
-      (r.electrical_conductivity !== undefined && (r.electrical_conductivity < 0.5 || r.electrical_conductivity > 1.5))
+      (r.electrical_conductivity !== undefined && (r.electrical_conductivity * 1000 < 200 || r.electrical_conductivity * 1000 > 1200))
     ).length;
     
     return { avgMoisture, avgPh, alertCount };

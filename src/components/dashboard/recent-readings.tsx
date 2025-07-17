@@ -114,7 +114,7 @@ export function RecentReadings() {
               <TableCell>{reading.nitrogen !== undefined ? `${reading.nitrogen} mg/kg` : "N/A"}</TableCell>
               <TableCell>{reading.phosphorous !== undefined ? `${reading.phosphorous} mg/kg` : "N/A"}</TableCell>
               <TableCell>{reading.potassium !== undefined ? `${reading.potassium} mg/kg` : "N/A"}</TableCell>
-              <TableCell>{reading.electrical_conductivity !== undefined ? `${reading.electrical_conductivity} mS/cm` : "N/A"}</TableCell>
+              <TableCell>{reading.electrical_conductivity !== undefined ? `${(reading.electrical_conductivity * 1000).toFixed(0)} µS/cm` : "N/A"}</TableCell>
             </TableRow>
           ))}
         </TableBody>
