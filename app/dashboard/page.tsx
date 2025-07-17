@@ -3,15 +3,68 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Overview } from "@/components/dashboard/overview"
-import { RecentReadings } from "@/components/dashboard/recent-readings"
+// Note: Overview component removed as it's not used in current dashboard layout
+// Note: RecentReadings component removed as it's not used in current dashboard layout
 import { SoilHealthIndicator } from "@/components/dashboard/soil-health-indicator"
-import { getUserDevices, getDeviceLogs } from "@/lib/field-eyes-api"
+import { getUserDevices, getLatestDeviceLog } from "@/lib/field-eyes-api"
 import { transformDevices, transformSoilReadings } from "@/lib/transformers"
 import type { Device as FieldEyesDevice, SoilReading as FieldEyesSoilReading } from "@/types/field-eyes"
 import type { Device as IndexDevice, SoilReading as IndexSoilReading } from "@/types"
 import dynamic from 'next/dynamic'
 import { Skeleton } from "@/components/ui/skeleton"
+
+// Dashboard loading skeleton component
+const DashboardSkeleton = () => (
+  <div className="space-y-6">
+    {/* Stats cards skeleton */}
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {[...Array(4)].map((_, i) => (
+        <Card key={i}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <Skeleton className="h-4 w-[100px]" />
+            <Skeleton className="h-4 w-4" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-8 w-[60px] mb-2" />
+            <Skeleton className="h-3 w-[120px]" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+    
+    {/* Main content skeleton */}
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+      <Card className="col-span-4">
+        <CardHeader>
+          <Skeleton className="h-6 w-[80px]" />
+          <Skeleton className="h-4 w-[200px]" />
+        </CardHeader>
+        <CardContent className="p-0" style={{ height: '600px' }}>
+          <Skeleton className="h-full w-full rounded-lg" />
+        </CardContent>
+      </Card>
+      <Card className="col-span-3">
+        <CardHeader>
+          <Skeleton className="h-6 w-[100px]" />
+          <Skeleton className="h-4 w-[150px]" />
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <Skeleton className="h-[200px] w-full" />
+            <div className="space-y-2">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="flex justify-between">
+                  <Skeleton className="h-4 w-[80px]" />
+                  <Skeleton className="h-4 w-[60px]" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  </div>
+)
 import { DashboardMapProps, DashboardMapType } from "./map-types"
 
 // Dynamically import the FixedMap component with no SSR
@@ -119,6 +172,11 @@ export default function DashboardPage() {
   const [hoveredDevice, setHoveredDevice] = useState<FieldEyesDevice | null>(null)
   const [hoveredReadings, setHoveredReadings] = useState<FieldEyesSoilReading[]>([])
 
+  // Enhanced cache for device readings with better performance
+  const readingsCache = useRef<Map<string, { data: FieldEyesSoilReading[], timestamp: number, isStale: boolean }>>(new Map())
+  const CACHE_DURATION = 3 * 60 * 1000; // 3 minutes cache duration (reduced for fresher data)
+  const STALE_WHILE_REVALIDATE = 5 * 60 * 1000; // 5 minutes stale-while-revalidate
+
   // Helper to add debug events
   const addDebugEvent = (event: string) => {
     console.log("DEBUG EVENT:", event);
@@ -131,13 +189,58 @@ export default function DashboardPage() {
 
   const fetchDeviceReadings = async (device: FieldEyesDevice): Promise<FieldEyesSoilReading[]> => {
     try {
-      addDebugEvent(`Fetching readings for device ${device.serial_number}`);
-      const readings = await getDeviceLogs(device.serial_number);
-      addDebugEvent(`Got ${readings?.length || 0} readings for device ${device.serial_number}`);
-      return readings ? readings.map(r => ({...r})) : [];
+      const serialNumber = device.serial_number;
+      const cachedEntry = readingsCache.current.get(serialNumber);
+      const now = Date.now();
+
+      // Check if we have fresh cached data
+      if (cachedEntry && (now - cachedEntry.timestamp) < CACHE_DURATION) {
+        addDebugEvent(`Using fresh cached reading for device ${serialNumber}`);
+        return cachedEntry.data;
+      }
+
+      // Check if we have stale but usable cached data (stale-while-revalidate pattern)
+      if (cachedEntry && (now - cachedEntry.timestamp) < STALE_WHILE_REVALIDATE) {
+        addDebugEvent(`Using stale cached reading for device ${serialNumber}, revalidating in background`);
+        
+        // Return stale data immediately for better performance
+        const staleData = cachedEntry.data;
+        
+        // Revalidate in background (non-blocking)
+        setTimeout(async () => {
+          try {
+            const reading = await getLatestDeviceLog(serialNumber);
+            const readings = reading ? [reading] : [];
+            readingsCache.current.set(serialNumber, { data: readings, timestamp: now, isStale: false });
+            addDebugEvent(`Background revalidation completed for device ${serialNumber}`);
+          } catch (err) {
+            console.warn(`Background revalidation failed for device ${serialNumber}:`, err);
+          }
+        }, 0);
+        
+        return staleData;
+      }
+
+      // Fetch new data if no cache or cache is too old
+      addDebugEvent(`Fetching latest reading for device ${serialNumber}`);
+      const reading = await getLatestDeviceLog(serialNumber);
+      addDebugEvent(`Got latest reading for device ${serialNumber}`);
+      const readings = reading ? [reading] : [];
+
+      // Update cache with fresh data
+      readingsCache.current.set(serialNumber, { data: readings, timestamp: now, isStale: false });
+      return readings;
     } catch (err) {
-      console.error(`Error fetching logs for device ${device.serial_number}:`, err)
-      addDebugEvent(`Error fetching logs for device ${device.serial_number}`);
+      console.error(`Error fetching latest reading for device ${device.serial_number}:`, err)
+      addDebugEvent(`Error fetching latest reading for device ${device.serial_number}`);
+      
+      // Return cached data if available, even if stale, rather than empty array
+      const cachedEntry = readingsCache.current.get(device.serial_number);
+      if (cachedEntry) {
+        addDebugEvent(`Returning stale cached data due to fetch error for device ${device.serial_number}`);
+        return cachedEntry.data;
+      }
+      
       return []
     }
   }
@@ -246,6 +349,7 @@ export default function DashboardPage() {
       try {
         setIsLoading(true)
         
+        // Step 1: Fetch devices list quickly
         const devices = await getUserDevices()
         if (!mounted || !devices || devices.length === 0) {
           setIsLoading(false)
@@ -253,64 +357,105 @@ export default function DashboardPage() {
         }
         setAllDevices(devices)
 
+        // Step 2: Show basic dashboard immediately with device count
+        setDashboardStats(prev => ({
+          ...prev,
+          totalDevices: devices.length
+        }))
+
+        // Step 3: Only fetch readings for first device initially (fastest UI response)
         if (!selectedDevice && devices.length > 0) {
           const firstDevice = devices[0]
-          const deviceReadings = await fetchDeviceReadings(firstDevice)
           
-          if (mounted) {
-            setDefaultDevice(firstDevice)
-            setDefaultDeviceReadings(deviceReadings)
-          }
-        }
-
-        const oneWeekAgo = new Date()
-        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
-
-        const readingsForStatsPromises = devices.slice(0, 5).map(device => fetchDeviceReadings(device))
-        const allReadingsArrays = await Promise.all(readingsForStatsPromises);
-        const allReadingsFlat = allReadingsArrays.flat();
-
-        if (mounted) {
-          // Update initial dashboard stats
-          const activeDevice = selectedDevice || defaultDevice;
+          // Set default device immediately (no waiting for readings)
+          setDefaultDevice(firstDevice)
+          setIsLoading(false) // Show UI immediately
           
-          const totalDevices = devices.length;
-          const weeklyReadings = activeDevice 
-            ? allReadingsFlat.filter(r => r.serial_number === activeDevice.serial_number && new Date(r.created_at) >= oneWeekAgo)
-            : allReadingsFlat.filter(r => new Date(r.created_at) >= oneWeekAgo);
-            
-          let totalMoisture = 0, moistureCount = 0, totalPh = 0, phCount = 0;
-          
-          weeklyReadings.forEach((reading) => {
-            if (reading.soil_moisture !== undefined) {
-              totalMoisture += reading.soil_moisture;
-              moistureCount++;
+          // Fetch readings asynchronously in background
+          fetchDeviceReadings(firstDevice).then(deviceReadings => {
+            if (mounted) {
+              setDefaultDeviceReadings(deviceReadings)
             }
-            if (reading.ph !== undefined) {
-              totalPh += reading.ph;
-              phCount++;
-            }
-          });
-          
-          const avgMoisture = moistureCount > 0 ? Math.round(totalMoisture / moistureCount) : 0;
-          const avgPh = phCount > 0 ? Number.parseFloat((totalPh / phCount).toFixed(1)) : 0;
-          
-          const alertCount = weeklyReadings.filter(r => 
-            (r.ph !== undefined && (r.ph < 5.5 || r.ph > 7.5)) ||
-            (r.soil_moisture !== undefined && (r.soil_moisture < 30 || r.soil_moisture > 70)) ||
-            (r.soil_temperature !== undefined && (r.soil_temperature < 15 || r.soil_temperature > 30)) ||
-            (r.electrical_conductivity !== undefined && (r.electrical_conductivity < 0.5 || r.electrical_conductivity > 1.5))
-          ).length;
-          
-          setDashboardStats({
-            totalDevices,
-            avgMoisture,
-            avgPh,
-            alertCount,
-          });
-          
+          }).catch(err => {
+            console.warn("Error fetching default device readings:", err)
+          })
+        } else {
           setIsLoading(false)
         }
+
+        // Step 4: Fetch stats for all devices in background (non-blocking)
+        setTimeout(async () => {
+          if (!mounted) return
+          
+          try {
+            const oneWeekAgo = new Date()
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+
+            // Batch API calls in smaller chunks to prevent overwhelming
+            const BATCH_SIZE = 3
+            const allReadingsFlat: FieldEyesSoilReading[] = []
+            
+            for (let i = 0; i < Math.min(devices.length, 10); i += BATCH_SIZE) {
+              const batch = devices.slice(i, i + BATCH_SIZE)
+              const batchPromises = batch.map(device => 
+                fetchDeviceReadings(device).catch(err => {
+                  console.warn(`Failed to fetch readings for device ${device.serial_number}:`, err)
+                  return [] // Return empty array for failed requests
+                })
+              )
+              
+              const batchResults = await Promise.all(batchPromises)
+              allReadingsFlat.push(...batchResults.flat())
+              
+              // Small delay between batches to prevent API overload
+              if (i + BATCH_SIZE < devices.length) {
+                await new Promise(resolve => setTimeout(resolve, 100))
+              }
+            }
+
+            if (mounted) {
+              // Update dashboard stats
+              const activeDevice = selectedDevice || defaultDevice
+              const weeklyReadings = activeDevice 
+                ? allReadingsFlat.filter(r => r.serial_number === activeDevice.serial_number && new Date(r.created_at) >= oneWeekAgo)
+                : allReadingsFlat.filter(r => new Date(r.created_at) >= oneWeekAgo)
+                
+              let totalMoisture = 0, moistureCount = 0, totalPh = 0, phCount = 0
+              
+              weeklyReadings.forEach((reading) => {
+                if (reading.soil_moisture !== undefined) {
+                  totalMoisture += reading.soil_moisture
+                  moistureCount++
+                }
+                if (reading.ph !== undefined) {
+                  totalPh += reading.ph
+                  phCount++
+                }
+              })
+              
+              const avgMoisture = moistureCount > 0 ? Math.round(totalMoisture / moistureCount) : 0
+              const avgPh = phCount > 0 ? Number.parseFloat((totalPh / phCount).toFixed(1)) : 0
+              
+              const alertCount = weeklyReadings.filter(r => 
+                (r.ph !== undefined && (r.ph < 5.5 || r.ph > 7.5)) ||
+                (r.soil_moisture !== undefined && (r.soil_moisture < 30 || r.soil_moisture > 70)) ||
+                (r.soil_temperature !== undefined && (r.soil_temperature < 15 || r.soil_temperature > 30)) ||
+                (r.electrical_conductivity !== undefined && (r.electrical_conductivity < 0.5 || r.electrical_conductivity > 1.5))
+              ).length
+              
+              setDashboardStats({
+                totalDevices: devices.length,
+                avgMoisture,
+                avgPh,
+                alertCount,
+              })
+            }
+          } catch (err) {
+            console.warn("Error fetching background stats:", err)
+            // Don't show error to user since this is background loading
+          }
+        }, 0) // Start immediately but non-blocking
+        
       } catch (err) {
         console.error("Error fetching dashboard data:", err)
         if (mounted) {
@@ -444,6 +589,20 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show skeleton loading only on initial load
+  if (isLoading && allDevices.length === 0) {
+    return (
+      <div className="flex-col md:flex">
+        <div className="flex-1 space-y-4 p-8 pt-6">
+          <div className="flex items-center justify-between space-y-2 mb-6">
+            <Skeleton className="h-9 w-[200px]" />
+          </div>
+          <DashboardSkeleton />
         </div>
       </div>
     )

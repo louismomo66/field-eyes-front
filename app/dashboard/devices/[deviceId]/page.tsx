@@ -1125,7 +1125,7 @@ const ReadingsGrid = memo(
                           Nitrogen
                         </span>
                         <span className={`text-xs ${getNutrientColor(readings.nitrogen.value)}`}>
-                          {readings.nitrogen.value}% - {getNutrientLevel(readings.nitrogen.value)}
+                          {readings.nitrogen.value} mg/kg - {getNutrientLevel(readings.nitrogen.value)}
                         </span>
                       </div>
                       <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
@@ -1144,7 +1144,7 @@ const ReadingsGrid = memo(
                           Phosphorus
                         </span>
                         <span className={`text-xs ${getNutrientColor(readings.phosphorus.value)}`}>
-                          {readings.phosphorus.value}% - {getNutrientLevel(readings.phosphorus.value)}
+                          {readings.phosphorus.value} mg/kg - {getNutrientLevel(readings.phosphorus.value)}
                         </span>
                       </div>
                       <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
@@ -1163,7 +1163,7 @@ const ReadingsGrid = memo(
                           Potassium
                         </span>
                         <span className={`text-xs ${getNutrientColor(readings.potassium.value)}`}>
-                          {readings.potassium.value}% - {getNutrientLevel(readings.potassium.value)}
+                          {readings.potassium.value} mg/kg - {getNutrientLevel(readings.potassium.value)}
                         </span>
                       </div>
                       <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">

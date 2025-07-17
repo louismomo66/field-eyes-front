@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { AlertCircle, Battery, Eye, Loader2, Plus, Signal, Trash2 } from "lucide-react"
+import { AlertCircle, Eye, Loader2, Plus, Trash2 } from "lucide-react"
 import { getUserDevices, claimDevice, deleteDevice, getLatestDeviceLog, registerDevice, APIError } from "@/lib/field-eyes-api"
 import { transformDevices } from "@/lib/transformers"
 import { Device } from "@/types/field-eyes"
@@ -61,8 +61,6 @@ export default function DevicesPage() {
                 ...device,
                 name: device.name || `Field Sensor ${device.id}`, // Use provided name if available, fall back to default
                 status,
-                battery: Math.floor(Math.random() * 100), // Simulate battery level
-                signal: status === "offline" ? "No Signal" : "Strong",
                 lastReading: formatRelativeTime(latestReading.created_at)
               }
             } catch (err) {
@@ -71,8 +69,6 @@ export default function DevicesPage() {
                 ...device,
                 name: device.name || `Field Sensor ${device.id}`, // Use provided name if available, fall back to default
                 status: "offline" as const,
-                battery: 0,
-                signal: "No Signal",
                 lastReading: "Unknown"
               }
             }
@@ -191,8 +187,8 @@ export default function DevicesPage() {
       }
       
       toast({
-        title: "Device Claimed",
-        description: "The device has been successfully claimed and added to your account",
+        title: "Device Added",
+        description: "The device has been successfully added to your account",
       })
       
       // Reset form and close dialog
@@ -265,13 +261,13 @@ export default function DevicesPage() {
           <DialogTrigger asChild>
             <Button className="bg-green-600 hover:bg-green-700">
               <Plus className="mr-2 h-4 w-4" />
-              Claim Device
+              Add Device
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Claim a Device</DialogTitle>
-              <DialogDescription>Add an existing unclaimed device to your account.</DialogDescription>
+              <DialogTitle>Add a Device</DialogTitle>
+              <DialogDescription>Add an existing device to your account by entering its serial number.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
@@ -311,10 +307,10 @@ export default function DevicesPage() {
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Claiming...
+                    Adding...
                   </>
                 ) : (
-                  'Claim Device'
+                  'Add Device'
                 )}
               </Button>
             </DialogFooter>
@@ -348,12 +344,12 @@ export default function DevicesPage() {
         <div className="flex flex-col justify-center items-center h-[200px] text-center">
           <p className="text-lg font-medium mb-2">No devices found</p>
           <p className="text-sm text-muted-foreground mb-4">
-            {searchTerm ? "Try adjusting your search terms" : "Click 'Claim Device' to add an existing device to your account"}
+            {searchTerm ? "Try adjusting your search terms" : "Click 'Add Device' to add an existing device to your account"}
           </p>
           {!searchTerm && (
             <Button className="bg-green-600 hover:bg-green-700" onClick={() => setIsAddDeviceOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
-              Claim Device
+              Add Device
             </Button>
           )}
         </div>
@@ -362,28 +358,26 @@ export default function DevicesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[200px]">Device Name</TableHead>
-                <TableHead>Serial Number</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Battery</TableHead>
-                <TableHead>Signal</TableHead>
-                <TableHead>Last Reading</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="w-1/4">Device Name</TableHead>
+                <TableHead className="w-1/4">Serial Number</TableHead>
+                <TableHead className="w-1/6">Status</TableHead>
+                <TableHead className="w-1/6">Last Reading</TableHead>
+                <TableHead className="w-1/6 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredDevices.filter(device => device !== null && device !== undefined).map((device) => (
                 <TableRow key={device.serial_number}>
-                  <TableCell className="font-medium">{device.name}</TableCell>
-                  <TableCell>{device.serial_number}</TableCell>
-                  <TableCell>
-                    <Badge className={
+                  <TableCell className="font-medium w-1/4">{device.name}</TableCell>
+                  <TableCell className="text-sm text-gray-600 w-1/4">{device.serial_number}</TableCell>
+                  <TableCell className="w-1/6">
+                    <Badge className={`text-xs ${
                       device.status === "active"
                         ? "bg-green-500"
                         : device.status === "warning"
                           ? "bg-amber-500 text-white"
                           : "bg-red-500 text-white"
-                    }>
+                    }`}>
                       {device.status === "active" 
                         ? "Active" 
                         : device.status === "warning" 
@@ -391,44 +385,21 @@ export default function DevicesPage() {
                           : "Offline"}
                     </Badge>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center">
-                      <Battery className={`h-4 w-4 mr-1 ${
-                        device.battery && device.battery > 20 
-                          ? "text-green-500" 
-                          : device.battery && device.battery > 0 
-                            ? "text-amber-500" 
-                            : "text-gray-400"
-                      }`} />
-                      <span>{device.battery && device.battery > 0 ? `${device.battery}%` : "Unknown"}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center">
-                      <Signal className={`h-4 w-4 mr-1 ${
-                        device.status === "active" 
-                          ? "text-green-500" 
-                          : "text-red-500"
-                      }`} />
-                      <span>{device.signal}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>{device.lastReading}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
+                  <TableCell className="text-sm text-gray-600 w-1/6">{device.lastReading}</TableCell>
+                  <TableCell className="text-right w-1/6">
+                    <div className="flex justify-end gap-1">
                       <Button variant="outline" size="sm" asChild>
                         <Link href={`/dashboard/devices/${device.serial_number}`}>
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
+                          <Eye className="h-4 w-4" />
                         </Link>
                       </Button>
                       <Button 
                         variant="outline" 
                         size="sm"
                         onClick={() => handleDeleteDevice(device.serial_number)}
+                        className="text-red-600 hover:text-red-700"
                       >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>
