@@ -39,21 +39,28 @@ export function BasicSoilAnalysis({ data }: BasicSoilAnalysisProps) {
           { label: "Very High", max: 14 }
         ]};
       case "Nitrogen":
-      case "Phosphorous":
         return { min: 0, max: 100, ranges: [
-          { label: "Very Low", max: 10 },
-          { label: "Low", max: 20 },
-          { label: "Optimum", max: 40 },
-          { label: "High", max: 60 },
+          { label: "Very Low", max: 15 },
+          { label: "Low", max: 25 },
+          { label: "Optimum", max: 50 },
+          { label: "High", max: 75 },
           { label: "Very High", max: 100 }
         ]};
+      case "Phosphorous":
+        return { min: 0, max: 150, ranges: [
+          { label: "Very Low", max: 20 },
+          { label: "Low", max: 30 },
+          { label: "Optimum", max: 50 },
+          { label: "High", max: 100 },
+          { label: "Very High", max: 150 }
+        ]};
       case "Potassium":
-        return { min: 0, max: 800, ranges: [
-          { label: "Very Low", max: 100 },
-          { label: "Low", max: 150 },
-          { label: "Optimum", max: 250 },
-          { label: "High", max: 400 },
-          { label: "Very High", max: 800 }
+        return { min: 0, max: 300, ranges: [
+          { label: "Very Low", max: 80 },
+          { label: "Low", max: 100 },
+          { label: "Optimum", max: 180 },
+          { label: "High", max: 250 },
+          { label: "Very High", max: 300 }
         ]};
       case "Soil Moisture":
         return { min: 0, max: 100, ranges: [
@@ -64,12 +71,12 @@ export function BasicSoilAnalysis({ data }: BasicSoilAnalysisProps) {
           { label: "Very High", max: 100 }
         ]};
       case "Electrical Conductivity":
-        return { min: 0, max: 4, ranges: [
-          { label: "Very Low", max: 0.5 },
-          { label: "Low", max: 0.8 },
-          { label: "Optimum", max: 1.5 },
-          { label: "High", max: 2.5 },
-          { label: "Very High", max: 4.0 }
+        return { min: 0, max: 2, ranges: [
+          { label: "Very Low", max: 0.25 },
+          { label: "Low", max: 0.5 },
+          { label: "Optimum", max: 1.0 },
+          { label: "High", max: 1.5 },
+          { label: "Very High", max: 2.0 }
         ]};
       default:
         return { min: 0, max: 100, ranges: [

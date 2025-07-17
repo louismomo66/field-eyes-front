@@ -699,12 +699,12 @@ const NutrientsCombinedCard = memo(({
 }) => {
   // Determine overall status based on all nutrients
   const getStatus = () => {
-    const nitrogenOptimal = nitrogenValue >= 15 && nitrogenValue <= 30;
-    const phosphorusOptimal = phosphorusValue >= 10 && phosphorusValue <= 20;
-    const potassiumOptimal = potassiumValue >= 10 && potassiumValue <= 20;
+    const nitrogenOptimal = nitrogenValue >= 25 && nitrogenValue <= 50;
+    const phosphorusOptimal = phosphorusValue >= 30 && phosphorusValue <= 50;
+    const potassiumOptimal = potassiumValue >= 100 && potassiumValue <= 180;
     
     if (nitrogenOptimal && phosphorusOptimal && potassiumOptimal) return "optimal";
-    if (nitrogenValue < 15 || phosphorusValue < 10 || potassiumValue < 10) return "low";
+    if (nitrogenValue < 25 || phosphorusValue < 30 || potassiumValue < 100) return "low";
     return "high";
   };
   
@@ -732,9 +732,9 @@ const NutrientsCombinedCard = memo(({
   const colors = statusColors[status];
   
   // Calculate percentage for the progress bar (0-100)
-  const nitrogenPercentage = Math.min(Math.max(((nitrogenValue - 0) / (50 - 0)) * 100, 0), 100);
-  const phosphorusPercentage = Math.min(Math.max(((phosphorusValue - 0) / (30 - 0)) * 100, 0), 100);
-  const potassiumPercentage = Math.min(Math.max(((potassiumValue - 0) / (30 - 0)) * 100, 0), 100);
+  const nitrogenPercentage = Math.min(Math.max(((nitrogenValue - 0) / (100 - 0)) * 100, 0), 100);
+  const phosphorusPercentage = Math.min(Math.max(((phosphorusValue - 0) / (150 - 0)) * 100, 0), 100);
+  const potassiumPercentage = Math.min(Math.max(((potassiumValue - 0) / (300 - 0)) * 100, 0), 100);
   
   // Nutrient colors
   const nutrientColors = {
@@ -808,7 +808,7 @@ const NutrientsCombinedCard = memo(({
             <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
               <div 
                 className="h-full bg-amber-500 rounded-full transition-all duration-500"
-                style={{ width: `${Math.min(((potassiumValue) / 30) * 100, 100)}%` }}
+                style={{ width: `${Math.min(((potassiumValue) / 300) * 100, 100)}%` }}
               ></div>
             </div>
           </div>
@@ -967,17 +967,47 @@ const ReadingsGrid = memo(
   ({ readings }: { readings: ReadingsData }) => {
     if (!readings) return null;
     
-    // Helper functions for styling
-    const getNutrientLevel = (value: number) => {
-      if (value < 15) return 'Low'
-      if (value > 30) return 'High'
-      return 'Optimal'
+    // Helper functions for styling (updated for soil analysis ranges)
+    const getNutrientLevel = (value: number, nutrientType: 'N' | 'P' | 'K' = 'N') => {
+      switch(nutrientType) {
+        case 'N': // Nitrogen
+          if (value < 25) return 'Low'
+          if (value > 50) return 'High'
+          return 'Optimal'
+        case 'P': // Phosphorus  
+          if (value < 30) return 'Low'
+          if (value > 100) return 'High'
+          return 'Optimal'
+        case 'K': // Potassium
+          if (value < 100) return 'Low'
+          if (value > 250) return 'High'
+          return 'Optimal'
+        default:
+          if (value < 25) return 'Low'
+          if (value > 50) return 'High'
+          return 'Optimal'
+      }
     }
 
-    const getNutrientColor = (value: number) => {
-      if (value < 15) return 'text-red-500'
-      if (value > 30) return 'text-amber-500'
-      return 'text-green-500'
+    const getNutrientColor = (value: number, nutrientType: 'N' | 'P' | 'K' = 'N') => {
+      switch(nutrientType) {
+        case 'N': // Nitrogen
+          if (value < 25) return 'text-red-500'
+          if (value > 50) return 'text-amber-500'
+          return 'text-green-500'
+        case 'P': // Phosphorus
+          if (value < 30) return 'text-red-500'
+          if (value > 100) return 'text-amber-500'
+          return 'text-green-500'
+        case 'K': // Potassium
+          if (value < 100) return 'text-red-500'
+          if (value > 250) return 'text-amber-500'
+          return 'text-green-500'
+        default:
+          if (value < 25) return 'text-red-500'
+          if (value > 50) return 'text-amber-500'
+          return 'text-green-500'
+      }
     }
 
     const getPhStatus = (ph: number) => {
@@ -1124,14 +1154,14 @@ const ReadingsGrid = memo(
                           <span className="h-2 w-2 rounded-full bg-green-500 mr-1.5"></span>
                           Nitrogen
                         </span>
-                        <span className={`text-xs ${getNutrientColor(readings.nitrogen.value)}`}>
-                          {readings.nitrogen.value} mg/kg - {getNutrientLevel(readings.nitrogen.value)}
+                        <span className={`text-xs ${getNutrientColor(readings.nitrogen.value, 'N')}`}>
+                          {readings.nitrogen.value} mg/kg - {getNutrientLevel(readings.nitrogen.value, 'N')}
                         </span>
                       </div>
                       <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
                         <div 
                           className="h-full bg-green-500 rounded-full transition-all duration-500"
-                          style={{ width: `${Math.min(((readings.nitrogen.value) / 50) * 100, 100)}%` }}
+                          style={{ width: `${Math.min(((readings.nitrogen.value) / 100) * 100, 100)}%` }}
                         ></div>
                       </div>
                     </div>
@@ -1143,14 +1173,14 @@ const ReadingsGrid = memo(
                           <span className="h-2 w-2 rounded-full bg-red-500 mr-1.5"></span>
                           Phosphorus
                         </span>
-                        <span className={`text-xs ${getNutrientColor(readings.phosphorus.value)}`}>
-                          {readings.phosphorus.value} mg/kg - {getNutrientLevel(readings.phosphorus.value)}
+                        <span className={`text-xs ${getNutrientColor(readings.phosphorus.value, 'P')}`}>
+                          {readings.phosphorus.value} mg/kg - {getNutrientLevel(readings.phosphorus.value, 'P')}
                         </span>
                       </div>
                       <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
                         <div 
                           className="h-full bg-red-500 rounded-full transition-all duration-500"
-                          style={{ width: `${Math.min(((readings.phosphorus.value) / 30) * 100, 100)}%` }}
+                          style={{ width: `${Math.min(((readings.phosphorus.value) / 150) * 100, 100)}%` }}
                         ></div>
                       </div>
                     </div>
@@ -1162,14 +1192,14 @@ const ReadingsGrid = memo(
                           <span className="h-2 w-2 rounded-full bg-amber-500 mr-1.5"></span>
                           Potassium
                         </span>
-                        <span className={`text-xs ${getNutrientColor(readings.potassium.value)}`}>
-                          {readings.potassium.value} mg/kg - {getNutrientLevel(readings.potassium.value)}
+                        <span className={`text-xs ${getNutrientColor(readings.potassium.value, 'K')}`}>
+                          {readings.potassium.value} mg/kg - {getNutrientLevel(readings.potassium.value, 'K')}
                         </span>
                       </div>
                       <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
                         <div 
                           className="h-full bg-amber-500 rounded-full transition-all duration-500"
-                          style={{ width: `${Math.min(((readings.potassium.value) / 30) * 100, 100)}%` }}
+                          style={{ width: `${Math.min(((readings.potassium.value) / 300) * 100, 100)}%` }}
                         ></div>
                       </div>
                     </div>
@@ -1188,7 +1218,7 @@ const ReadingsGrid = memo(
                       <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
                         <div 
                           className="h-full bg-blue-500 rounded-full transition-all duration-500"
-                          style={{ width: `${Math.min(((readings.ec.value) / 4) * 100, 100)}%` }}
+                          style={{ width: `${Math.min(((readings.ec.value) / 2) * 100, 100)}%` }}
                         ></div>
                       </div>
                     </div>

@@ -44,10 +44,10 @@ const parameterMeta: Record<string, ParamMeta> = {
   ambientTemp: { name: "Air Temperature", color: "#f97316", unit: "°C", min: 0, max: 40 },
   humidity: { name: "Air Humidity", color: "#0ea5e9", unit: "%", min: 0, max: 100 },
   ph: { name: "Soil pH", color: "#8b5cf6", unit: "", min: 0, max: 14 },
-  nitrogen: { name: "Nitrogen (N)", color: "#22c55e", unit: "mg/kg", min: 0, max: 50 },
-  phosphorus: { name: "Phosphorus (P)", color: "#f97316", unit: "mg/kg", min: 0, max: 30 },
-  potassium: { name: "Potassium (K)", color: "#eab308", unit: "mg/kg", min: 0, max: 30 },
-  ec: { name: "Electrical Conductivity", color: "#06b6d4", unit: "mS/cm", min: 0, max: 4 },
+      nitrogen: { name: "Nitrogen (N)", color: "#22c55e", unit: "mg/kg", min: 0, max: 100 },
+    phosphorus: { name: "Phosphorus (P)", color: "#f97316", unit: "mg/kg", min: 0, max: 150 },
+    potassium: { name: "Potassium (K)", color: "#eab308", unit: "mg/kg", min: 0, max: 300 },
+      ec: { name: "Electrical Conductivity", color: "#06b6d4", unit: "mS/cm", min: 0, max: 2 },
 }
 
 // Parameter data mapping - handles different property names in the API
