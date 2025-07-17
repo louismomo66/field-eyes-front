@@ -126,10 +126,13 @@ export function SoilHealthIndicator({ device, readings = [] }: SoilHealthIndicat
     const temperatureScore = convertToScore(avgTemperature, 15, 25, 100);
     const phScore = convertToScore(avgPh, 6.0, 7.0, 100);
     
-    // For potentially missing NPK values, ensure we have some score
-    const nitrogenScore = convertToScore(avgNitrogen, 10, 20, 100);
-    const phosphorusScore = convertToScore(avgPhosphorus, 5, 15, 100);
-    const potassiumScore = convertToScore(avgPotassium, 5, 15, 100);
+    // NPK scores using proper soil analysis ranges
+    // Nitrogen: Optimal 25-50 mg/kg
+    const nitrogenScore = convertToScore(avgNitrogen, 25, 50, 100);
+    // Phosphorus: Optimal 30-50 mg/kg
+    const phosphorusScore = convertToScore(avgPhosphorus, 30, 50, 100);
+    // Potassium: Optimal 100-180 mg/kg
+    const potassiumScore = convertToScore(avgPotassium, 100, 180, 100);
     const ecScore = convertToScore(avgEc, 200, 800, 100);
 
     // Organic matter - use a value based on the other indicators as a rough estimate
