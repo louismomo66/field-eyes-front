@@ -415,8 +415,6 @@ export default function GenerateReportPage() {
       'UpdatedAt',
       'DeletedAt',
       'DeviceId',
-      'created_at',
-      'CreatedAt',
       'id',
       'ID',
       '_id'
@@ -439,6 +437,8 @@ export default function GenerateReportPage() {
     // Prioritize important fields in a specific order
     const priorityFields = [
       'timestamp',               // Timestamp field
+      'created_at',              // Created timestamp
+      'CreatedAt',               // Created timestamp (alternative)
       'serial_number',           // Device ID
       'electrical_conductivity', // EC (primary field)
       'ec',                      // EC (alias)
@@ -461,8 +461,15 @@ export default function GenerateReportPage() {
       !excludedFields.includes(field.toLowerCase())
     );
     
-    // Find timestamp field - use 'timestamp' if available
-    const timestampField = filteredFields.includes('timestamp') ? 'timestamp' : null;
+    // Find timestamp field - prioritize 'timestamp', then 'created_at', then 'CreatedAt'
+    let timestampField = null;
+    if (filteredFields.includes('timestamp')) {
+      timestampField = 'timestamp';
+    } else if (filteredFields.includes('created_at')) {
+      timestampField = 'created_at';
+    } else if (filteredFields.includes('CreatedAt')) {
+      timestampField = 'CreatedAt';
+    }
     
     // Create ordered field list with timestamp first if available
     let orderedFields = [];
@@ -501,7 +508,7 @@ export default function GenerateReportPage() {
         const value = log[field];
         
         // Format dates
-        if (field === 'timestamp' && value) {
+        if ((field === 'timestamp' || field === 'created_at' || field === 'CreatedAt') && value) {
           try {
             return new Date(value).toLocaleString();
           } catch (e) {
@@ -895,7 +902,7 @@ export default function GenerateReportPage() {
                   />
                 )
               ) : (
-                <CsvPreview data={csvData} />
+                <CsvPreview data={csvData} deviceName={devices.find(d => String(d.id) === selectedDevices[0])?.name || selectedDevices[0]} />
               )
             )}
           </div>
