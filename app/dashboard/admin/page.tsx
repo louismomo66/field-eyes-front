@@ -139,13 +139,17 @@ export default function AdminPage() {
     try {
       console.log(`Fetching activity for ${devicesList.length} devices...`)
       
-      // Process each device individually to ensure unique timestamps
-      for (const device of devicesList) {
+      // Process each device STRICTLY ONE AT A TIME to avoid any race conditions
+      for (let i = 0; i < devicesList.length; i++) {
+        const device = devicesList[i]
+        
         try {
-          // Log device info to track which device we're processing
-          console.log(`Processing device: ${device.serial_number} (ID: ${device.id})`)
+          // Clear log to make it easier to track each device individually
+          console.log('----------------------------------------------')
+          console.log(`Processing device ${i+1}/${devicesList.length}: ${device.serial_number} (ID: ${device.id})`)
           
-          // Use exactly the same function as the devices page to get the latest log
+          // Use the admin-specific endpoint to get the latest log
+          // Wait for each request to complete before moving to the next device
           const latestLog = await getLatestDeviceLogForAdmin(device.serial_number)
           
           // Log the result with the device ID to ensure we're tracking the right device
@@ -158,7 +162,7 @@ export default function AdminPage() {
           
           // Verify that the log is for the correct device
           if (latestLog && latestLog.serial_number && latestLog.serial_number !== device.serial_number) {
-            console.error(`Mismatch! Log serial ${latestLog.serial_number} doesn't match device ${device.serial_number}`)
+            console.error(`CRITICAL ERROR: Mismatch! Log serial ${latestLog.serial_number} doesn't match device ${device.serial_number}`)
             continue // Skip this device if there's a mismatch
           }
           
@@ -166,7 +170,7 @@ export default function AdminPage() {
           if (latestLog && latestLog.created_at) {
             const timestamp = new Date(latestLog.created_at)
             activityMap[device.id] = timestamp
-            console.log(`Added activity for device ${device.id} (${device.serial_number}): ${timestamp.toISOString()}`)
+            console.log(`SUCCESS: Added activity for device ${device.id} (${device.serial_number}): ${timestamp.toISOString()}`)
           } else {
             console.log(`No valid timestamp for device ${device.id} (${device.serial_number})`)
           }
@@ -183,18 +187,16 @@ export default function AdminPage() {
         }
       }
       
-      // Update the state with all device activity timestamps
-      console.log('Final activity map:', Object.keys(activityMap).length, 'devices with activity')
-      console.log('Activity map details:', Object.entries(activityMap).map(([deviceId, timestamp]) => {
-        return {
-          deviceId,
-          timestamp: timestamp.toISOString(),
-          formattedTime: formatDate(timestamp.toISOString())
-        }
-      }))
+      // Debug the activity map before setting state
+      console.log('----------------------------------------------')
+      console.log('FINAL ACTIVITY MAP:');
+      console.log(`Total devices with activity: ${Object.keys(activityMap).length}/${devicesList.length}`);
+      for (const [deviceId, timestamp] of Object.entries(activityMap)) {
+        console.log(`Device ID: ${deviceId}, Timestamp: ${timestamp.toISOString()}`);
+      }
       
-      // Set the state with the new activity map
-      setDeviceLastActivity(activityMap)
+      // Set the state with the new activity map - do this AFTER all processing is complete
+      setDeviceLastActivity({...activityMap}) // Use a new object to ensure state update
     } catch (err) {
       console.error("Error fetching device activity:", err)
     }
@@ -241,6 +243,12 @@ export default function AdminPage() {
     // Get the last activity timestamp for this device
     const lastActivity = deviceLastActivity[device.id]
     
+    // Debug information
+    console.log(`getDeviceStatus for device ${device.id} (${device.serial_number}):`, {
+      hasLastActivity: !!lastActivity,
+      lastActivityTime: lastActivity ? lastActivity.toISOString() : 'none'
+    })
+    
     if (!lastActivity) {
       return "offline" // No activity data available
     }
@@ -248,6 +256,9 @@ export default function AdminPage() {
     // Calculate time difference in minutes
     const now = new Date()
     const diffMinutes = (now.getTime() - lastActivity.getTime()) / (1000 * 60)
+    
+    // Debug time difference
+    console.log(`Time difference for device ${device.id}: ${diffMinutes.toFixed(2)} minutes`)
     
     // Match devices page logic: only active or offline
     // If reading is older than 30 minutes, mark as offline
