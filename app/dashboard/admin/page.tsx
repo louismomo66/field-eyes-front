@@ -169,10 +169,19 @@ export default function AdminPage() {
           // Only add to activity map if we have a valid timestamp
           if (latestLog && latestLog.created_at) {
             const timestamp = new Date(latestLog.created_at)
-            activityMap[device.id] = timestamp
-            console.log(`SUCCESS: Added activity for device ${device.id} (${device.serial_number}): ${timestamp.toISOString()}`)
+            // Use device.ID (uppercase) if available, otherwise fall back to device.id (lowercase)
+            // This handles the case where the API returns uppercase ID
+            const deviceId = (device as any).ID || device.id
+            if (!deviceId) {
+              console.error(`ERROR: Device ID is missing for ${device.serial_number}. Using serial number as key.`)
+              // Use serial number as fallback key if ID is missing
+              activityMap[`serial-${device.serial_number}`] = timestamp
+            } else {
+              activityMap[deviceId] = timestamp
+            }
+            console.log(`SUCCESS: Added activity for device ${deviceId || device.serial_number} (${device.serial_number}): ${timestamp.toISOString()}`)
           } else {
-            console.log(`No valid timestamp for device ${device.id} (${device.serial_number})`)
+            console.log(`No valid timestamp for device ${(device as any).ID || device.id || device.serial_number} (${device.serial_number})`)
           }
         } catch (error) {
           // Handle "no logs found" error gracefully - this is expected for new devices
@@ -240,11 +249,14 @@ export default function AdminPage() {
   }
 
   const getDeviceStatus = (device: Device) => {
+    // Get the device ID (handle both uppercase and lowercase)
+    const deviceId = (device as any).ID || device.id || `serial-${device.serial_number}`
+    
     // Get the last activity timestamp for this device
-    const lastActivity = deviceLastActivity[device.id]
+    const lastActivity = deviceLastActivity[deviceId]
     
     // Debug information
-    console.log(`getDeviceStatus for device ${device.id} (${device.serial_number}):`, {
+    console.log(`getDeviceStatus for device ${deviceId} (${device.serial_number}):`, {
       hasLastActivity: !!lastActivity,
       lastActivityTime: lastActivity ? lastActivity.toISOString() : 'none'
     })
@@ -258,7 +270,7 @@ export default function AdminPage() {
     const diffMinutes = (now.getTime() - lastActivity.getTime()) / (1000 * 60)
     
     // Debug time difference
-    console.log(`Time difference for device ${device.id}: ${diffMinutes.toFixed(2)} minutes`)
+    console.log(`Time difference for device ${deviceId}: ${diffMinutes.toFixed(2)} minutes`)
     
     // Match devices page logic: only active or offline
     // If reading is older than 30 minutes, mark as offline
@@ -467,43 +479,49 @@ export default function AdminPage() {
                         </TooltipProvider>
                       </TableCell>
                       <TableCell>
-                        {deviceLastActivity[device.id] ? (
-                          <TooltipProvider key={`last-logged-tooltip-${device.id}`}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div className="flex items-center gap-1 cursor-help">
-                                  <span className={`${getDeviceStatus(device) === 'active' ? 'text-green-600 font-medium' : ''}`}>
-                                    {formatTimeAgo(deviceLastActivity[device.id])}
-                                  </span>
-                                </div>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>
-                                  {formatDate(deviceLastActivity[device.id].toISOString())}
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        ) : (
-                          <TooltipProvider key={`no-activity-tooltip-${device.id}`}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div className="flex items-center gap-1 cursor-help text-gray-500">
-                                  <span>Never</span>
-                                  <Info className="h-3 w-3 text-gray-400" />
-                                </div>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>
-                                  No logs found for this device.<br/>
-                                  This is normal for newly added devices that haven't sent data yet.<br/>
-                                  Device ID: {device.id}<br/>
-                                  Serial: {device.serial_number}
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )}
+                        {(() => {
+                          // Get the device ID (handle both uppercase and lowercase)
+                          const deviceId = (device as any).ID || device.id || `serial-${device.serial_number}`
+                          const lastActivity = deviceLastActivity[deviceId]
+                          
+                          return lastActivity ? (
+                            <TooltipProvider key={`last-logged-tooltip-${deviceId}`}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center gap-1 cursor-help">
+                                    <span className={`${getDeviceStatus(device) === 'active' ? 'text-green-600 font-medium' : ''}`}>
+                                      {formatTimeAgo(lastActivity)}
+                                    </span>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>
+                                    {formatDate(lastActivity.toISOString())}
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : (
+                            <TooltipProvider key={`no-activity-tooltip-${deviceId}`}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center gap-1 cursor-help text-gray-500">
+                                    <span>Never</span>
+                                    <Info className="h-3 w-3 text-gray-400" />
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>
+                                    No logs found for this device.<br/>
+                                    This is normal for newly added devices that haven't sent data yet.<br/>
+                                    Device ID: {deviceId}<br/>
+                                    Serial: {device.serial_number}
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )
+                        })()}
                       </TableCell>
                       <TableCell>{formatDate(device.created_at)}</TableCell>
                       <TableCell>
