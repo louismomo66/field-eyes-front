@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { getAllDevicesForAdmin, getDeviceLogsForAdmin } from "@/lib/field-eyes-api"
 import { isAdmin } from "@/lib/client-auth"
 import { Device, SoilReading } from "@/types/field-eyes"
-import { Search, Eye, Users, Cpu, Database, Calendar, Info } from "lucide-react"
+import { Search, Eye, Users, Cpu, Database, Calendar, Info, RefreshCw } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useRouter } from "next/navigation"
 
@@ -25,6 +25,8 @@ export default function AdminPage() {
   const [logsLoading, setLogsLoading] = useState(false)
   const [logsDialogOpen, setLogsDialogOpen] = useState(false)
   const [deviceLastActivity, setDeviceLastActivity] = useState<Record<number, Date>>({})
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
+  const [refreshing, setRefreshing] = useState<boolean>(false)
   const router = useRouter()
 
   const [isAdminUser, setIsAdminUser] = useState(false)
@@ -62,6 +64,32 @@ export default function AdminPage() {
     
     checkAdminStatus();
   }, [router])
+  
+  // Set up periodic refresh of device status
+  useEffect(() => {
+    // Only set up refresh if we're on the admin page
+    if (!isAdminUser) return;
+    
+    // Refresh device activity every 60 seconds
+    const refreshInterval = setInterval(() => {
+      if (!refreshing && devices.length > 0) {
+        console.log("Auto-refreshing device activity status...");
+        setRefreshing(true);
+        fetchDeviceActivity(devices)
+          .then(() => {
+            setLastRefresh(new Date());
+            setRefreshing(false);
+          })
+          .catch(err => {
+            console.error("Error during auto-refresh:", err);
+            setRefreshing(false);
+          });
+      }
+    }, 60000); // 60 seconds
+    
+    // Clean up interval on unmount
+    return () => clearInterval(refreshInterval);
+  }, [isAdminUser, devices, refreshing]);
 
   useEffect(() => {
         // Filter devices based on search term
@@ -101,13 +129,10 @@ export default function AdminPage() {
         // Create an array of promises for the batch
         const promises = batch.map(async (device) => {
           try {
-            const logs = await getDeviceLogsForAdmin(device.serial_number)
-            if (logs && logs.length > 0) {
-              // Get the most recent log
-              const latestLog = logs[0]
-              if (latestLog.created_at) {
-                activityMap[device.id] = new Date(latestLog.created_at)
-              }
+            // Get only the latest log for each device instead of all logs
+            const latestLog = await getDeviceLogsForAdmin(device.serial_number, undefined, undefined, true)
+            if (latestLog && latestLog.length > 0 && latestLog[0].created_at) {
+              activityMap[device.id] = new Date(latestLog[0].created_at)
             }
           } catch (error) {
             console.error(`Error fetching logs for device ${device.serial_number}:`, error)
@@ -220,6 +245,42 @@ export default function AdminPage() {
             Manage all devices and view system-wide data
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => {
+              setRefreshing(true);
+              fetchDeviceActivity(devices)
+                .then(() => {
+                  setLastRefresh(new Date());
+                  setRefreshing(false);
+                })
+                .catch(err => {
+                  console.error("Error refreshing device status:", err);
+                  setRefreshing(false);
+                });
+            }}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Refreshing...' : 'Refresh Status'}
+          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="text-xs text-muted-foreground cursor-help">
+                  Last updated: {formatTimeAgo(lastRefresh)}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>
+                  {formatDate(lastRefresh.toISOString())}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -310,7 +371,7 @@ export default function AdminPage() {
               </TableHeader>
               <TableBody>
                 {filteredDevices.length === 0 ? (
-                  <TableRow>
+                  <TableRow key="no-devices-row">
                     <TableCell colSpan={6} className="text-center py-8">
                       {devices.length === 0 ? "No devices found" : "No devices match your search"}
                     </TableCell>
@@ -342,9 +403,26 @@ export default function AdminPage() {
                         </TooltipProvider>
                       </TableCell>
                       <TableCell>
-                        {deviceLastActivity[device.id] 
-                          ? formatTimeAgo(deviceLastActivity[device.id])
-                          : 'Never'}
+                        {deviceLastActivity[device.id] ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center gap-1 cursor-help">
+                                  <span className={`${getDeviceStatus(device) === 'Active' ? 'text-green-600 font-medium' : ''}`}>
+                                    {formatTimeAgo(deviceLastActivity[device.id])}
+                                  </span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>
+                                  {formatDate(deviceLastActivity[device.id].toISOString())}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          <span className="text-gray-500">Never</span>
+                        )}
                       </TableCell>
                       <TableCell>{formatDate(device.created_at)}</TableCell>
                       <TableCell>
@@ -401,7 +479,7 @@ export default function AdminPage() {
                 </TableHeader>
                 <TableBody>
                   {deviceLogs.length === 0 ? (
-                    <TableRow>
+                    <TableRow key="no-logs-row">
                       <TableCell colSpan={9} className="text-center py-8">
                         No logs found for this device
                       </TableCell>

@@ -291,9 +291,15 @@ export async function getAllDevicesForAdmin(): Promise<Device[]> {
   return fetchAPI<Device[]>("/admin/devices")
 }
 
-export async function getDeviceLogsForAdmin(serialNumber: string, startDate?: string, endDate?: string): Promise<SoilReading[]> {
+export async function getDeviceLogsForAdmin(
+  serialNumber: string, 
+  startDate?: string, 
+  endDate?: string,
+  latestOnly?: boolean
+): Promise<SoilReading[]> {
   let url = `/admin/device-logs?serial_number=${encodeURIComponent(serialNumber)}`
   if (startDate) url += `&start_date=${encodeURIComponent(startDate)}`
   if (endDate) url += `&end_date=${encodeURIComponent(endDate)}`
+  if (latestOnly) url += `&latest_only=true`
   return fetchAPI<SoilReading[]>(url)
 } 
