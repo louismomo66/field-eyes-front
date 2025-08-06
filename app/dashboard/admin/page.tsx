@@ -280,7 +280,7 @@ export default function AdminPage() {
             <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
             {refreshing ? 'Refreshing...' : 'Refresh Status'}
           </Button>
-          <TooltipProvider>
+          <TooltipProvider key="last-refresh-tooltip">
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className="text-xs text-muted-foreground cursor-help">
@@ -396,7 +396,7 @@ export default function AdminPage() {
                       <TableCell className="font-mono">{device.serial_number}</TableCell>
                       <TableCell>{device.name || "—"}</TableCell>
                       <TableCell>
-                        <TooltipProvider>
+                        <TooltipProvider key={`status-tooltip-${device.id}`}>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div className="flex items-center gap-1">
@@ -418,7 +418,7 @@ export default function AdminPage() {
                       </TableCell>
                       <TableCell>
                         {deviceLastActivity[device.id] ? (
-                          <TooltipProvider>
+                          <TooltipProvider key={`last-logged-tooltip-${device.id}`}>
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <div className="flex items-center gap-1 cursor-help">
@@ -435,7 +435,7 @@ export default function AdminPage() {
                             </Tooltip>
                           </TooltipProvider>
                         ) : (
-                          <TooltipProvider>
+                          <TooltipProvider key={`no-activity-tooltip-${device.id}`}>
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <div className="flex items-center gap-1 cursor-help text-gray-500">
@@ -515,8 +515,8 @@ export default function AdminPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    deviceLogs.slice(0, 100).map((log) => (
-                      <TableRow key={log.id}>
+                    deviceLogs.slice(0, 100).map((log, index) => (
+                      <TableRow key={log.id || `log-${index}`}>
                         <TableCell className="font-mono text-sm">
                           {formatDate(log.created_at)}
                         </TableCell>
