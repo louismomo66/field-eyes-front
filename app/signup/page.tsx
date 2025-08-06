@@ -6,7 +6,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { User, Mail, Lock } from "lucide-react"
+import { User, Mail, Lock, Shield } from "lucide-react"
 import { signup } from "@/lib/field-eyes-api"
 
 // Helper function for asset paths
@@ -17,6 +17,7 @@ export default function SignupPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [adminCode, setAdminCode] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -53,8 +54,9 @@ export default function SignupPage() {
     try {
       await signup({
         name: username,
-          email,
-          password,
+        email,
+        password,
+        admin_code: adminCode || undefined
       })
 
       // Small delay to ensure token is stored before redirect
@@ -178,6 +180,25 @@ export default function SignupPage() {
                       placeholder="Confirm your password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="pl-10 border-gray-300"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="adminCode" className="text-sm text-gray-600 flex items-center gap-1">
+                    <Shield className="h-4 w-4 text-[#62A800]" /> Admin Code (Optional)
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3">
+                      <Shield className="h-5 w-5 text-[#62A800]" />
+                    </div>
+                    <Input
+                      type="text"
+                      id="adminCode"
+                      placeholder="Enter admin code if you have one"
+                      value={adminCode}
+                      onChange={(e) => setAdminCode(e.target.value)}
                       className="pl-10 border-gray-300"
                     />
                   </div>

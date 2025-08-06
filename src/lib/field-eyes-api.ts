@@ -105,18 +105,27 @@ import {
   }
   
   export async function signup(userData: RegisterRequest): Promise<LoginResponse> {
-    // Map name to username as expected by the backend
-    const formattedData = {
-      username: userData.name,
-      email: userData.email,
-      password: userData.password
-    }
-    
-    return fetchAPI<LoginResponse>("/signup", {
-      method: "POST",
-      body: JSON.stringify(formattedData),
-    })
+  // Map name to username as expected by the backend
+  const formattedData = {
+    username: userData.name,
+    email: userData.email,
+    password: userData.password,
+    ...(userData.admin_code && { admin_code: userData.admin_code })
   }
+  
+  const response = await fetchAPI<LoginResponse>("/signup", {
+    method: "POST",
+    body: JSON.stringify(formattedData),
+  })
+  
+  // Store the token using our auth utility
+  if (response.token) {
+    setToken(response.token)
+    console.log("Token stored after signup, user role:", response.user?.role || "unknown")
+  }
+  
+  return response
+}
   
   export async function forgotPassword(email: string): Promise<MessageResponse> {
     return fetchAPI<MessageResponse>("/forgot-password", {

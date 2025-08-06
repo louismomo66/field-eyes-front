@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { signup, APIError } from "@/lib/field-eyes-api"
-import { AlertCircle } from "lucide-react"
+import { AlertCircle, Shield } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 export default function RegisterPage() {
@@ -19,6 +19,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [adminCode, setAdminCode] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const router = useRouter()
@@ -45,7 +46,8 @@ export default function RegisterPage() {
       await signup({
         name,
         email,
-        password
+        password,
+        admin_code: adminCode || undefined
       })
       
       // Show success message
@@ -134,6 +136,18 @@ export default function RegisterPage() {
                 placeholder="Confirm your password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="admin-code" className="flex items-center gap-1">
+                <Shield className="h-4 w-4" /> Admin Code (Optional)
+              </Label>
+              <Input
+                id="admin-code"
+                type="text"
+                placeholder="Enter admin code if you have one"
+                value={adminCode}
+                onChange={(e) => setAdminCode(e.target.value)}
               />
             </div>
           </CardContent>
