@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { useState, useEffect } from "react"
-import { Home, Cpu, FileText, Settings, Menu, LogOut } from "lucide-react"
+import { Home, Cpu, FileText, Settings, Menu, LogOut, Shield } from "lucide-react"
+import { isAdmin } from "@/lib/client-auth"
 
 // Helper function for asset paths
 const assetPath = (path: string) => `/app${path.startsWith('/') ? path : `/${path}`}`;
@@ -13,10 +14,23 @@ interface SidebarProps {
 
 export function Sidebar({ currentPath, className, onCollapse }: SidebarProps) {
   const [menuCollapsed, setMenuCollapsed] = useState(false);
+  const [userIsAdmin, setUserIsAdmin] = useState(false);
 
   useEffect(() => {
     onCollapse?.(menuCollapsed);
   }, [menuCollapsed, onCollapse]);
+  
+  // Check if user is admin when component mounts
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const isUserAdmin = isAdmin();
+        setUserIsAdmin(isUserAdmin);
+      } catch (error) {
+        console.error('Error checking admin status:', error);
+      }
+    }
+  }, []);
 
   const routes = [
     {
@@ -39,6 +53,12 @@ export function Sidebar({ currentPath, className, onCollapse }: SidebarProps) {
       icon: Settings,
       href: "/dashboard/settings",
     },
+    // Show Admin link only if user is admin
+    ...(userIsAdmin ? [{
+      label: "Admin",
+      icon: Shield,
+      href: "/dashboard/admin",
+    }] : []),
   ]
 
   return (

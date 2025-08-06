@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Home, Cpu, FileText, Settings, Menu, X, LogOut } from "lucide-react";
+import { Home, Cpu, FileText, Settings, Menu, X, LogOut, Shield } from "lucide-react";
+import { isAdmin } from "@/lib/client-auth";
 
 // Helper function for asset paths
 const assetPath = (path: string) => `/app${path.startsWith('/') ? path : `/${path}`}`;
@@ -14,6 +15,19 @@ interface MobileSidebarProps {
 
 export function MobileSidebar({ currentPath, className }: MobileSidebarProps) {
   const [open, setOpen] = useState(false)
+  const [userIsAdmin, setUserIsAdmin] = useState(false)
+  
+  // Check if user is admin when component mounts
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const isUserAdmin = isAdmin();
+        setUserIsAdmin(isUserAdmin);
+      } catch (error) {
+        console.error('Error checking admin status:', error);
+      }
+    }
+  }, [])
 
   const routes = [
     {
@@ -36,6 +50,12 @@ export function MobileSidebar({ currentPath, className }: MobileSidebarProps) {
       icon: Settings,
       href: "/dashboard/settings",
     },
+    // Show Admin link only if user is admin
+    ...(userIsAdmin ? [{
+      label: "Admin",
+      icon: Shield,
+      href: "/dashboard/admin",
+    }] : []),
   ]
 
   return (
