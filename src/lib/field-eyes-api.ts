@@ -302,4 +302,38 @@ export async function getDeviceLogsForAdmin(
   if (endDate) url += `&end_date=${encodeURIComponent(endDate)}`
   if (latestOnly) url += `&latest_only=true`
   return fetchAPI<SoilReading[]>(url)
+}
+
+export async function getLatestDeviceLogForAdmin(serialNumber: string): Promise<SoilReading> {
+  // Try using the admin-specific endpoint with latest_only=true parameter
+  console.log(`Admin requesting latest log for device ${serialNumber}`)
+  try {
+    // First try the admin endpoint with latest_only=true
+    const logs = await getDeviceLogsForAdmin(serialNumber, undefined, undefined, true)
+    console.log(`Admin received logs for ${serialNumber}:`, logs ? {
+      count: logs.length,
+      firstLog: logs.length > 0 ? {
+        id: logs[0].id,
+        created_at: logs[0].created_at
+      } : 'No logs'
+    } : 'No data')
+    
+    if (logs && logs.length > 0) {
+      return logs[0]
+    }
+    
+    // If no logs from admin endpoint, try the regular endpoint as fallback
+    console.log(`Falling back to regular endpoint for ${serialNumber}`)
+    const result = await fetchAPI<SoilReading>(`/latest-device-log?serial_number=${serialNumber}`)
+    console.log(`Regular endpoint result for ${serialNumber}:`, result ? {
+      id: result.id,
+      created_at: result.created_at,
+      hasData: !!result
+    } : 'No data')
+    
+    return result
+  } catch (error) {
+    console.error(`Error in getLatestDeviceLogForAdmin for ${serialNumber}:`, error)
+    throw error
+  }
 } 

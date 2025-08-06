@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { getAllDevicesForAdmin, getDeviceLogsForAdmin } from "@/lib/field-eyes-api"
+import { getAllDevicesForAdmin, getDeviceLogsForAdmin, getLatestDeviceLogForAdmin } from "@/lib/field-eyes-api"
 import { isAdmin } from "@/lib/client-auth"
 import { Device, SoilReading } from "@/types/field-eyes"
 import { Search, Eye, Users, Cpu, Database, Calendar, Info, RefreshCw } from "lucide-react"
@@ -121,21 +121,34 @@ export default function AdminPage() {
     const activityMap: Record<number, Date> = {}
     
     try {
+      console.log(`Fetching activity for ${devicesList.length} devices...`)
+      
       // Process devices in batches to avoid too many simultaneous requests
       const batchSize = 5
       for (let i = 0; i < devicesList.length; i += batchSize) {
         const batch = devicesList.slice(i, i + batchSize)
+        console.log(`Processing batch ${i/batchSize + 1}: ${batch.map(d => d.serial_number).join(', ')}`)
         
         // Create an array of promises for the batch
         const promises = batch.map(async (device) => {
           try {
-            // Get only the latest log for each device instead of all logs
-            const latestLog = await getDeviceLogsForAdmin(device.serial_number, undefined, undefined, true)
-            if (latestLog && latestLog.length > 0 && latestLog[0].created_at) {
-              activityMap[device.id] = new Date(latestLog[0].created_at)
+            // Use the same function as the devices page to get the latest log
+            console.log(`Fetching latest log for device ${device.serial_number} (ID: ${device.id})`)
+            const latestLog = await getLatestDeviceLogForAdmin(device.serial_number)
+            console.log(`Latest log for ${device.serial_number}:`, latestLog ? {
+              id: latestLog.id,
+              created_at: latestLog.created_at,
+              hasTimestamp: !!latestLog.created_at
+            } : 'No log data')
+            
+            if (latestLog && latestLog.created_at) {
+              activityMap[device.id] = new Date(latestLog.created_at)
+              console.log(`Added activity for device ${device.id}: ${new Date(latestLog.created_at).toISOString()}`)
+            } else {
+              console.log(`No valid timestamp for device ${device.id}`)
             }
           } catch (error) {
-            console.error(`Error fetching logs for device ${device.serial_number}:`, error)
+            console.error(`Error fetching latest log for device ${device.serial_number}:`, error)
           }
         })
         
@@ -144,6 +157,7 @@ export default function AdminPage() {
       }
       
       // Update the state with all device activity timestamps
+      console.log('Final activity map:', Object.keys(activityMap).length, 'devices with activity')
       setDeviceLastActivity(activityMap)
     } catch (err) {
       console.error("Error fetching device activity:", err)
@@ -421,7 +435,23 @@ export default function AdminPage() {
                             </Tooltip>
                           </TooltipProvider>
                         ) : (
-                          <span className="text-gray-500">Never</span>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center gap-1 cursor-help text-gray-500">
+                                  <span>Never</span>
+                                  <Info className="h-3 w-3 text-gray-400" />
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>
+                                  No activity data found for this device.<br/>
+                                  Device ID: {device.id}<br/>
+                                  Serial: {device.serial_number}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         )}
                       </TableCell>
                       <TableCell>{formatDate(device.created_at)}</TableCell>
