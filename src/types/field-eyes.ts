@@ -91,12 +91,11 @@ export interface Device {
   }
   
   // Register user request
-export interface RegisterRequest {
-  name: string
-  email: string
-  password: string
-  admin_code?: string
-}
+  export interface RegisterRequest {
+    name: string
+    email: string
+    password: string
+  }
   
   // API response with message
   export interface MessageResponse {

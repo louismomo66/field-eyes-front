@@ -215,20 +215,8 @@ import {
   }
   
   export async function getLatestDeviceLog(serialNumber: string): Promise<SoilReading> {
-  console.log(`Fetching latest log for device ${serialNumber} (regular user endpoint)`)
-  try {
-    const result = await fetchAPI<SoilReading>(`/latest-device-log?serial_number=${serialNumber}`)
-    console.log(`Regular endpoint result for ${serialNumber}:`, result ? {
-      id: result.id,
-      created_at: result.created_at,
-      hasData: !!result
-    } : 'No data')
-    return result
-  } catch (error) {
-    console.error(`Error in getLatestDeviceLog for ${serialNumber}:`, error)
-    throw error
+    return fetchAPI<SoilReading>(`/latest-device-log?serial_number=${serialNumber}`)
   }
-}
   
   export async function deleteDevice(serialNumber: string): Promise<MessageResponse> {
     return fetchAPI<MessageResponse>(`/delete-device?serial_number=${serialNumber}`, {

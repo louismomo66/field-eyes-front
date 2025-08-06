@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { getAllDevicesForAdmin, getDeviceLogsForAdmin, getLatestDeviceLog } from "@/lib/field-eyes-api"
+import { getAllDevicesForAdmin, getDeviceLogsForAdmin, getLatestDeviceLogForAdmin } from "@/lib/field-eyes-api"
 import { isAdmin } from "@/lib/client-auth"
 import { Device, SoilReading } from "@/types/field-eyes"
 import { Search, Eye, Users, Cpu, Database, Calendar, Info, RefreshCw } from "lucide-react"
@@ -132,9 +132,9 @@ export default function AdminPage() {
         // Create an array of promises for the batch
         const promises = batch.map(async (device) => {
           try {
-            // Use exactly the same function as the devices page to get the latest log
+            // Use the same function as the devices page to get the latest log
             console.log(`Fetching latest log for device ${device.serial_number} (ID: ${device.id})`)
-            const latestLog = await getLatestDeviceLog(device.serial_number)
+            const latestLog = await getLatestDeviceLogForAdmin(device.serial_number)
             console.log(`Latest log for ${device.serial_number}:`, latestLog ? {
               id: latestLog.id,
               created_at: latestLog.created_at,
@@ -213,24 +213,26 @@ export default function AdminPage() {
     const now = new Date()
     const diffMinutes = (now.getTime() - lastActivity.getTime()) / (1000 * 60)
     
-    // Match devices page logic exactly: only active or offline
     // Device is active if it has logged data in the last 30 minutes
     if (diffMinutes <= 30) {
       return "Active"
+    } else if (diffMinutes <= 120) { // 2 hours
+      return "Warning" // Inactive for a while but not completely offline
     } else {
-      return "Offline" // Over 30 minutes = offline (matching devices page)
+      return "Offline"
     }
   }
 
-  // Get the CSS class for the badge based on status (matching devices page)
-  const getStatusBadgeClass = (status: string): string => {
+  const getStatusBadgeVariant = (status: string) => {
     switch (status.toLowerCase()) {
       case 'active':
-        return 'bg-green-500' // Green for active devices
+        return 'success' // Green for active devices
+      case 'warning':
+        return 'warning' // Yellow/orange for warning state
       case 'offline':
-        return 'bg-red-500 text-white' // Red for offline devices
+        return 'destructive' // Red for offline devices
       default:
-        return 'bg-gray-500 text-white'
+        return 'outline'
     }
   }
 
@@ -398,7 +400,7 @@ export default function AdminPage() {
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div className="flex items-center gap-1">
-                                <Badge className={`text-xs ${getStatusBadgeClass(getDeviceStatus(device))}`}>
+                                <Badge variant={getStatusBadgeVariant(getDeviceStatus(device))}>
                                   {getDeviceStatus(device)}
                                 </Badge>
                                 <Info className="h-3 w-3 text-gray-400" />
