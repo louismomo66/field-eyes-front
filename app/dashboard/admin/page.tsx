@@ -70,7 +70,22 @@ export default function AdminPage() {
     // Only set up refresh if we're on the admin page
     if (!isAdminUser) return;
     
-    // Refresh device activity every 60 seconds
+    // Initial refresh when component mounts
+    if (devices.length > 0 && !refreshing) {
+      console.log("Initial device activity refresh...");
+      setRefreshing(true);
+      fetchDeviceActivity(devices)
+        .then(() => {
+          setLastRefresh(new Date());
+          setRefreshing(false);
+        })
+        .catch(err => {
+          console.error("Error during initial refresh:", err);
+          setRefreshing(false);
+        });
+    }
+    
+    // Refresh device activity every 30 seconds (more frequent than before)
     const refreshInterval = setInterval(() => {
       if (!refreshing && devices.length > 0) {
         console.log("Auto-refreshing device activity status...");
@@ -85,7 +100,7 @@ export default function AdminPage() {
             setRefreshing(false);
           });
       }
-    }, 60000); // 60 seconds
+    }, 30000); // 30 seconds (more frequent updates)
     
     // Clean up interval on unmount
     return () => clearInterval(refreshInterval);
@@ -118,46 +133,67 @@ export default function AdminPage() {
   
   // Fetch the latest log for each device to determine activity status
   const fetchDeviceActivity = async (devicesList: Device[]) => {
+    // Create a new activity map to avoid any potential issues with shared references
     const activityMap: Record<number, Date> = {}
     
     try {
       console.log(`Fetching activity for ${devicesList.length} devices...`)
       
-      // Process devices in batches to avoid too many simultaneous requests
-      const batchSize = 5
-      for (let i = 0; i < devicesList.length; i += batchSize) {
-        const batch = devicesList.slice(i, i + batchSize)
-        console.log(`Processing batch ${i/batchSize + 1}: ${batch.map(d => d.serial_number).join(', ')}`)
-        
-        // Create an array of promises for the batch
-        const promises = batch.map(async (device) => {
-          try {
-            // Use the same function as the devices page to get the latest log
-            console.log(`Fetching latest log for device ${device.serial_number} (ID: ${device.id})`)
-            const latestLog = await getLatestDeviceLogForAdmin(device.serial_number)
-            console.log(`Latest log for ${device.serial_number}:`, latestLog ? {
-              id: latestLog.id,
-              created_at: latestLog.created_at,
-              hasTimestamp: !!latestLog.created_at
-            } : 'No log data')
-            
-            if (latestLog && latestLog.created_at) {
-              activityMap[device.id] = new Date(latestLog.created_at)
-              console.log(`Added activity for device ${device.id}: ${new Date(latestLog.created_at).toISOString()}`)
-            } else {
-              console.log(`No valid timestamp for device ${device.id}`)
-            }
-          } catch (error) {
-            console.error(`Error fetching latest log for device ${device.serial_number}:`, error)
+      // Process each device individually to ensure unique timestamps
+      for (const device of devicesList) {
+        try {
+          // Log device info to track which device we're processing
+          console.log(`Processing device: ${device.serial_number} (ID: ${device.id})`)
+          
+          // Use exactly the same function as the devices page to get the latest log
+          const latestLog = await getLatestDeviceLogForAdmin(device.serial_number)
+          
+          // Log the result with the device ID to ensure we're tracking the right device
+          console.log(`Latest log for device ${device.serial_number} (ID: ${device.id}):`, latestLog ? {
+            id: latestLog.id,
+            created_at: latestLog.created_at,
+            serial_number: latestLog.serial_number,
+            hasTimestamp: !!latestLog.created_at
+          } : 'No log data')
+          
+          // Verify that the log is for the correct device
+          if (latestLog && latestLog.serial_number && latestLog.serial_number !== device.serial_number) {
+            console.error(`Mismatch! Log serial ${latestLog.serial_number} doesn't match device ${device.serial_number}`)
+            continue // Skip this device if there's a mismatch
           }
-        })
-        
-        // Wait for all promises in the batch to resolve
-        await Promise.all(promises)
+          
+          // Only add to activity map if we have a valid timestamp
+          if (latestLog && latestLog.created_at) {
+            const timestamp = new Date(latestLog.created_at)
+            activityMap[device.id] = timestamp
+            console.log(`Added activity for device ${device.id} (${device.serial_number}): ${timestamp.toISOString()}`)
+          } else {
+            console.log(`No valid timestamp for device ${device.id} (${device.serial_number})`)
+          }
+        } catch (error) {
+          // Handle "no logs found" error gracefully - this is expected for new devices
+          if (error instanceof Error && error.message.includes("no logs found")) {
+            console.log(`No logs found for device ${device.serial_number} (ID: ${device.id}) - this is normal for new devices`)
+          } else {
+            console.error(`Error fetching latest log for device ${device.serial_number} (ID: ${device.id}):`, error)
+          }
+          
+          // Even with error, we don't need to do anything special - device will be shown as offline
+          // which is correct since it has no logs
+        }
       }
       
       // Update the state with all device activity timestamps
       console.log('Final activity map:', Object.keys(activityMap).length, 'devices with activity')
+      console.log('Activity map details:', Object.entries(activityMap).map(([deviceId, timestamp]) => {
+        return {
+          deviceId,
+          timestamp: timestamp.toISOString(),
+          formattedTime: formatDate(timestamp.toISOString())
+        }
+      }))
+      
+      // Set the state with the new activity map
       setDeviceLastActivity(activityMap)
     } catch (err) {
       console.error("Error fetching device activity:", err)
@@ -206,20 +242,19 @@ export default function AdminPage() {
     const lastActivity = deviceLastActivity[device.id]
     
     if (!lastActivity) {
-      return "Offline" // No activity data available
+      return "offline" // No activity data available
     }
     
     // Calculate time difference in minutes
     const now = new Date()
     const diffMinutes = (now.getTime() - lastActivity.getTime()) / (1000 * 60)
     
-    // Device is active if it has logged data in the last 30 minutes
+    // Match devices page logic: only active or offline
+    // If reading is older than 30 minutes, mark as offline
     if (diffMinutes <= 30) {
-      return "Active"
-    } else if (diffMinutes <= 120) { // 2 hours
-      return "Warning" // Inactive for a while but not completely offline
+      return "active"
     } else {
-      return "Offline"
+      return "offline" // Over 30 minutes = offline (matching devices page)
     }
   }
 
@@ -400,8 +435,12 @@ export default function AdminPage() {
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div className="flex items-center gap-1">
-                                <Badge variant={getStatusBadgeVariant(getDeviceStatus(device))}>
-                                  {getDeviceStatus(device)}
+                                <Badge className={`text-xs ${
+                                  getDeviceStatus(device) === "active"
+                                    ? "bg-green-500"
+                                    : "bg-red-500 text-white"
+                                }`}>
+                                  {getDeviceStatus(device) === "active" ? "Active" : "Offline"}
                                 </Badge>
                                 <Info className="h-3 w-3 text-gray-400" />
                               </div>
@@ -409,8 +448,8 @@ export default function AdminPage() {
                             <TooltipContent>
                               <p>
                                 {deviceLastActivity[device.id] 
-                                  ? `Last active: ${formatTimeAgo(deviceLastActivity[device.id])} (${formatDate(deviceLastActivity[device.id].toISOString())})` 
-                                  : 'No activity data available'}
+                                  ? `Last active: ${formatDate(deviceLastActivity[device.id].toISOString())}` 
+                                  : 'No logs found for this device. This is normal for newly added devices that haven\'t sent data yet.'}
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -422,7 +461,7 @@ export default function AdminPage() {
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <div className="flex items-center gap-1 cursor-help">
-                                  <span className={`${getDeviceStatus(device) === 'Active' ? 'text-green-600 font-medium' : ''}`}>
+                                  <span className={`${getDeviceStatus(device) === 'active' ? 'text-green-600 font-medium' : ''}`}>
                                     {formatTimeAgo(deviceLastActivity[device.id])}
                                   </span>
                                 </div>
@@ -445,7 +484,8 @@ export default function AdminPage() {
                               </TooltipTrigger>
                               <TooltipContent>
                                 <p>
-                                  No activity data found for this device.<br/>
+                                  No logs found for this device.<br/>
+                                  This is normal for newly added devices that haven't sent data yet.<br/>
                                   Device ID: {device.id}<br/>
                                   Serial: {device.serial_number}
                                 </p>

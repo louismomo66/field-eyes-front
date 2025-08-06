@@ -314,11 +314,17 @@ export async function getLatestDeviceLogForAdmin(serialNumber: string): Promise<
       count: logs.length,
       firstLog: logs.length > 0 ? {
         id: logs[0].id,
-        created_at: logs[0].created_at
+        created_at: logs[0].created_at,
+        serial_number: logs[0].serial_number
       } : 'No logs'
     } : 'No data')
     
     if (logs && logs.length > 0) {
+      // Verify the log belongs to the requested device
+      if (logs[0].serial_number && logs[0].serial_number !== serialNumber) {
+        console.error(`Mismatch in getLatestDeviceLogForAdmin: Log serial ${logs[0].serial_number} doesn't match requested ${serialNumber}`)
+        throw new Error(`Log serial number mismatch: ${logs[0].serial_number} vs ${serialNumber}`)
+      }
       return logs[0]
     }
     
@@ -328,8 +334,15 @@ export async function getLatestDeviceLogForAdmin(serialNumber: string): Promise<
     console.log(`Regular endpoint result for ${serialNumber}:`, result ? {
       id: result.id,
       created_at: result.created_at,
+      serial_number: result.serial_number,
       hasData: !!result
     } : 'No data')
+    
+    // Verify the log belongs to the requested device
+    if (result && result.serial_number && result.serial_number !== serialNumber) {
+      console.error(`Mismatch in getLatestDeviceLogForAdmin fallback: Log serial ${result.serial_number} doesn't match requested ${serialNumber}`)
+      throw new Error(`Log serial number mismatch: ${result.serial_number} vs ${serialNumber}`)
+    }
     
     return result
   } catch (error) {
