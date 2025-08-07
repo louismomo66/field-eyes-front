@@ -13,6 +13,22 @@ import { Device, SoilReading } from "@/types/field-eyes"
 import { Search, Eye, Users, Cpu, Database, Calendar, Info, RefreshCw } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useRouter } from "next/navigation"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { toast } from "@/components/ui/use-toast"
+
+// Date range presets for log filtering
+const dateRangePresets = {
+  '1day': 'Last 24 hours',
+  '7days': 'Last 7 days',
+  '30days': 'Last 30 days',
+  'all': 'All Time',
+}
 
 export default function AdminPage() {
   const [devices, setDevices] = useState<Device[]>([])
@@ -24,6 +40,7 @@ export default function AdminPage() {
   const [deviceLogs, setDeviceLogs] = useState<SoilReading[]>([])
   const [logsLoading, setLogsLoading] = useState(false)
   const [logsDialogOpen, setLogsDialogOpen] = useState(false)
+  const [dateRange, setDateRange] = useState("30days")
   const [deviceLastActivity, setDeviceLastActivity] = useState<Record<number, Date>>({})
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
   const [refreshing, setRefreshing] = useState<boolean>(false)
@@ -214,9 +231,22 @@ export default function AdminPage() {
   const fetchDeviceLogs = async (device: Device) => {
     try {
       setLogsLoading(true)
-      setSelectedDevice(device)
-      const logs = await getDeviceLogsForAdmin(device.serial_number)
+      let startDate: string | undefined
+      let endDate: string | undefined
+      
+      // Calculate date range based on selection
+      if (dateRange !== 'all') {
+        endDate = new Date().toISOString()
+        const days = parseInt(dateRange.replace('days', ''))
+        const start = new Date()
+        start.setDate(start.getDate() - days)
+        startDate = start.toISOString()
+      }
+      
+      // Use the admin-specific endpoint
+      const logs = await getDeviceLogsForAdmin(device.serial_number, startDate, endDate)
       setDeviceLogs(logs)
+      setSelectedDevice(device)
       setLogsDialogOpen(true)
     } catch (err: any) {
       setError(err.message || "Failed to fetch device logs")
@@ -548,14 +578,22 @@ export default function AdminPage() {
       <Dialog open={logsDialogOpen} onOpenChange={setLogsDialogOpen}>
         <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              Device Logs: {selectedDevice?.serial_number}
-            </DialogTitle>
-            <DialogDescription>
-              Viewing data logs for device {selectedDevice?.name || selectedDevice?.serial_number}
-            </DialogDescription>
+            <DialogTitle>Device Logs - {selectedDevice?.name || selectedDevice?.serial_number || "Unknown Device"}</DialogTitle>
+            <DialogDescription>View historical data for this device.</DialogDescription>
           </DialogHeader>
-          
+          {/* Date Range Selector */}
+          <div className="mb-4">
+            <Select value={dateRange} onValueChange={setDateRange}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select date range" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(dateRangePresets).map(([key, label]) => (
+                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           {logsLoading ? (
             <div className="flex items-center justify-center h-32">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
