@@ -228,7 +228,7 @@ export default function AdminPage() {
     }
   }
 
-  const fetchDeviceLogs = async (device: Device) => {
+  const fetchDeviceLogs = async (device: Device, openDialog: boolean = true) => {
     try {
       setLogsLoading(true)
       let startDate: string | undefined
@@ -237,23 +237,54 @@ export default function AdminPage() {
       // Calculate date range based on selection
       if (dateRange !== 'all') {
         endDate = new Date().toISOString()
-        const days = parseInt(dateRange.replace('days', ''))
+        let days: number
+        
+        // Parse the date range correctly
+        if (dateRange === '1day') {
+          days = 1
+        } else {
+          days = parseInt(dateRange.replace('days', '')) || 30 // fallback to 30 days
+        }
+        
         const start = new Date()
         start.setDate(start.getDate() - days)
         startDate = start.toISOString()
       }
       
+      console.log(`Fetching logs for ${device.serial_number} with date range:`, {
+        dateRange,
+        startDate,
+        endDate,
+        days: dateRange !== 'all' ? (dateRange === '1day' ? 1 : parseInt(dateRange.replace('days', '')) || 30) : 'all'
+      })
+      
       // Use the admin-specific endpoint
       const logs = await getDeviceLogsForAdmin(device.serial_number, startDate, endDate)
+      console.log(`Retrieved ${logs.length} logs for date range ${dateRange}`)
       setDeviceLogs(logs)
       setSelectedDevice(device)
-      setLogsDialogOpen(true)
+      if (openDialog) {
+        setLogsDialogOpen(true)
+      }
     } catch (err: any) {
-      setError(err.message || "Failed to fetch device logs")
+      console.error("Error fetching device logs:", err)
+      toast({
+        title: "Error",
+        description: err.message || "Failed to fetch device logs. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setLogsLoading(false)
     }
   }
+
+  // Refetch logs when date range changes (only if dialog is open)
+  useEffect(() => {
+    if (selectedDevice && logsDialogOpen) {
+      console.log(`Date range changed to ${dateRange}, refetching logs for ${selectedDevice.serial_number}`)
+      fetchDeviceLogs(selectedDevice, false) // Don't reopen dialog, just refetch
+    }
+  }, [dateRange])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString()
@@ -581,19 +612,32 @@ export default function AdminPage() {
             <DialogTitle>Device Logs - {selectedDevice?.name || selectedDevice?.serial_number || "Unknown Device"}</DialogTitle>
             <DialogDescription>View historical data for this device.</DialogDescription>
           </DialogHeader>
-          {/* Date Range Selector */}
-          <div className="mb-4">
-            <Select value={dateRange} onValueChange={setDateRange}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Select date range" />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(dateRangePresets).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+                     {/* Date Range Selector and Refresh Button */}
+           <div className="mb-4 flex items-center gap-4">
+             <Select value={dateRange} onValueChange={setDateRange}>
+               <SelectTrigger className="w-[180px]">
+                 <SelectValue placeholder="Select date range" />
+               </SelectTrigger>
+               <SelectContent>
+                 {Object.entries(dateRangePresets).map(([key, label]) => (
+                   <SelectItem key={key} value={key}>{label}</SelectItem>
+                 ))}
+               </SelectContent>
+             </Select>
+             <Button
+               variant="outline"
+               size="sm"
+               onClick={() => selectedDevice && fetchDeviceLogs(selectedDevice, false)}
+               disabled={logsLoading}
+               className="flex items-center gap-2"
+             >
+               <RefreshCw className={`h-4 w-4 ${logsLoading ? 'animate-spin' : ''}`} />
+               Refresh
+             </Button>
+             <div className="text-sm text-gray-600">
+               Showing {deviceLogs.length} logs for {dateRangePresets[dateRange as keyof typeof dateRangePresets]}
+             </div>
+           </div>
           {logsLoading ? (
             <div className="flex items-center justify-center h-32">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
