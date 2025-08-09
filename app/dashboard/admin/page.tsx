@@ -44,6 +44,8 @@ export default function AdminPage() {
   const [deviceLastActivity, setDeviceLastActivity] = useState<Record<number, Date>>({})
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
   const [refreshing, setRefreshing] = useState<boolean>(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [logsPerPage] = useState(100)
   const router = useRouter()
 
   const [isAdminUser, setIsAdminUser] = useState(false)
@@ -264,6 +266,7 @@ export default function AdminPage() {
       setDeviceLogs(logs)
       setSelectedDevice(device)
       if (openDialog) {
+        setCurrentPage(1) // Reset to first page when opening new device logs
         setLogsDialogOpen(true)
       }
     } catch (err: any) {
@@ -282,6 +285,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (selectedDevice && logsDialogOpen) {
       console.log(`Date range changed to ${dateRange}, refetching logs for ${selectedDevice.serial_number}`)
+      setCurrentPage(1) // Reset to first page when date range changes
       fetchDeviceLogs(selectedDevice, false) // Don't reopen dialog, just refetch
     }
   }, [dateRange])
@@ -510,12 +514,12 @@ export default function AdminPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredDevices.map((device) => (
-                    <TableRow key={device.id}>
+                  filteredDevices.map((device, index) => (
+                    <TableRow key={(device as any).ID || device.id || `device-${device.serial_number}-${index}`}>
                       <TableCell className="font-mono">{device.serial_number}</TableCell>
                       <TableCell>{device.name || "—"}</TableCell>
                       <TableCell>
-                        <TooltipProvider key={`status-tooltip-${device.id}`}>
+                        <TooltipProvider key={`status-tooltip-${(device as any).ID || device.id || device.serial_number}`}>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div className="flex items-center gap-1">
@@ -546,7 +550,7 @@ export default function AdminPage() {
                           const lastActivity = deviceLastActivity[deviceId]
                           
                           return lastActivity ? (
-                            <TooltipProvider key={`last-logged-tooltip-${deviceId}`}>
+                            <TooltipProvider key={`last-logged-tooltip-${device.serial_number}`}>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <div className="flex items-center gap-1 cursor-help">
@@ -563,7 +567,7 @@ export default function AdminPage() {
                               </Tooltip>
                             </TooltipProvider>
                           ) : (
-                            <TooltipProvider key={`no-activity-tooltip-${deviceId}`}>
+                            <TooltipProvider key={`no-activity-tooltip-${device.serial_number}`}>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <div className="flex items-center gap-1 cursor-help text-gray-500">
@@ -635,7 +639,7 @@ export default function AdminPage() {
                Refresh
              </Button>
              <div className="text-sm text-gray-600">
-               Showing {deviceLogs.length} logs for {dateRangePresets[dateRange as keyof typeof dateRangePresets]}
+               {deviceLogs.length} total logs for {dateRangePresets[dateRange as keyof typeof dateRangePresets]}
              </div>
            </div>
           {logsLoading ? (
@@ -666,8 +670,8 @@ export default function AdminPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    deviceLogs.slice(0, 100).map((log, index) => (
-                      <TableRow key={log.id || `log-${index}`}>
+                    deviceLogs.slice((currentPage - 1) * logsPerPage, currentPage * logsPerPage).map((log, index) => (
+                      <TableRow key={log.id || `log-${(currentPage - 1) * logsPerPage + index}`}>
                         <TableCell className="font-mono text-sm">
                           {formatDate(log.created_at)}
                         </TableCell>
@@ -684,9 +688,32 @@ export default function AdminPage() {
                   )}
                 </TableBody>
               </Table>
-              {deviceLogs.length > 100 && (
-                <div className="p-4 text-center text-sm text-muted-foreground border-t">
-                  Showing first 100 logs out of {deviceLogs.length} total logs
+              {deviceLogs.length > logsPerPage && (
+                <div className="flex items-center justify-between p-4 border-t">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {((currentPage - 1) * logsPerPage) + 1} to {Math.min(currentPage * logsPerPage, deviceLogs.length)} of {deviceLogs.length} logs
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      Page {currentPage} of {Math.ceil(deviceLogs.length / logsPerPage)}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.min(Math.ceil(deviceLogs.length / logsPerPage), prev + 1))}
+                      disabled={currentPage >= Math.ceil(deviceLogs.length / logsPerPage)}
+                    >
+                      Next
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
