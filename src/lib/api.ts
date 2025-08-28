@@ -1,6 +1,7 @@
 import type { Device, FieldBoundary, Report, ReportData, Notification, User, Farm, BasicSoilAnalysisReport } from "@/types"
 import type { SoilReading } from "@/types/field-eyes"
 import { getToken } from "@/lib/auth"
+import { isAdmin } from "@/lib/client-auth"
 
 // Base API URL - use the same URL as field-eyes-api
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:9002/api"
@@ -97,16 +98,28 @@ export async function generateReport(
   options: any,
 ): Promise<ReportData> {
   try {
+    // Check if user is admin
+    let userIsAdmin = false;
+    if (typeof window !== 'undefined') {
+      try {
+        userIsAdmin = isAdmin();
+      } catch (error) {
+        console.error("Error checking admin status:", error);
+      }
+    }
+    
     // Get device logs for CSV format
     if (options.format === "csv") {
-      console.log("Fetching device logs for CSV export:", deviceId, options.startDate, options.endDate);
+      console.log("Fetching device logs for CSV export:", deviceId, options.startDate, options.endDate, "Admin:", userIsAdmin);
       const queryParams = new URLSearchParams({
         serial_number: deviceId,
         start_date: options.startDate,
         end_date: options.endDate
       }).toString();
       
-      const logs = await fetchAPI<any[]>(`/get-device-logs?${queryParams}`);
+      // Use admin endpoint if user is admin, otherwise use regular endpoint
+      const endpoint = userIsAdmin ? `/admin/device-logs?${queryParams}` : `/get-device-logs?${queryParams}`;
+      const logs = await fetchAPI<any[]>(endpoint);
       
       console.log("Received logs for CSV:", logs);
       return {
@@ -124,7 +137,8 @@ export async function generateReport(
     }
 
     // Get basic soil analysis data for PDF reports
-    const basicAnalysisData = await fetchAPI<ReportData>("/reports/basic-soil-analysis", {
+    const endpoint = userIsAdmin ? "/admin/reports/basic-soil-analysis" : "/reports/basic-soil-analysis";
+    const basicAnalysisData = await fetchAPI<ReportData>(endpoint, {
       method: "POST",
       body: JSON.stringify({
         serial_number: deviceId,
