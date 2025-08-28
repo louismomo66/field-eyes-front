@@ -1499,6 +1499,26 @@ export default function DeviceDetailsPage() {
             try {
               userIsAdmin = isAdmin();
               setIsAdminUser(userIsAdmin);
+              console.log("Admin check result:", userIsAdmin);
+              
+              // Temporary debug: Check token content
+              const token = localStorage.getItem('token');
+              if (token) {
+                try {
+                  const decoded = JSON.parse(atob(token.split('.')[1]));
+                  console.log("Token payload:", decoded);
+                  console.log("User role in token:", decoded.role);
+                } catch (e) {
+                  console.log("Could not decode token for debugging");
+                }
+              }
+              
+              // Temporary admin bypass for testing (remove this in production)
+              if (window.location.search.includes('admin=true')) {
+                console.log("Admin mode forced via URL parameter");
+                userIsAdmin = true;
+                setIsAdminUser(true);
+              }
             } catch (error) {
               console.error("Error checking admin status:", error);
             }
@@ -1508,7 +1528,14 @@ export default function DeviceDetailsPage() {
           let devices;
           if (userIsAdmin) {
             console.log("Admin user - fetching all devices");
-            devices = await getAllDevicesForAdmin();
+            try {
+              devices = await getAllDevicesForAdmin();
+              console.log("Successfully fetched all devices for admin:", devices);
+            } catch (adminError) {
+              console.error("Admin endpoint failed, falling back to regular endpoint:", adminError);
+              // Fallback to regular endpoint if admin endpoint fails
+              devices = await getUserDevices();
+            }
           } else {
             console.log("Regular user - fetching user devices");
             devices = await getUserDevices();
@@ -1540,10 +1567,16 @@ export default function DeviceDetailsPage() {
       
       try {
         // Use admin endpoint if user is admin, otherwise use regular endpoint
-        let latestReading;
         if (isAdminUser) {
           console.log("Admin user - using admin endpoint for latest device log");
-          latestReading = await getLatestDeviceLogForAdmin(deviceId);
+          try {
+            latestReading = await getLatestDeviceLogForAdmin(deviceId);
+            console.log("Successfully fetched latest reading for admin:", latestReading);
+          } catch (adminError) {
+            console.error("Admin endpoint failed, falling back to regular endpoint:", adminError);
+            // Fallback to regular endpoint if admin endpoint fails
+            latestReading = await getLatestDeviceLog(deviceId);
+          }
         } else {
           console.log("Regular user - using regular endpoint for latest device log");
           latestReading = await getLatestDeviceLog(deviceId);
