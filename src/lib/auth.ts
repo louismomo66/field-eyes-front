@@ -38,25 +38,33 @@ export function getTokenFromStorage(): string | null {
 
 export function getUserFromToken(): User | null {
   const token = getTokenFromStorage()
-  if (!token) return null
+  if (!token) {
+    console.log("getUserFromToken: No token found");
+    return null;
+  }
 
   try {
+    console.log("getUserFromToken: Decoding token...");
     const decoded = jwtDecode<TokenPayload>(token)
+    console.log("getUserFromToken: Decoded token payload:", decoded);
     
     // Check if token is expired
     if (decoded.exp * 1000 < Date.now()) {
+      console.log("getUserFromToken: Token expired");
       localStorage.removeItem('token')
       return null
     }
 
-    return {
+    const user = {
       id: decoded.user_id,
       name: '', // Name not included in token, would need separate call
       email: decoded.email,
       role: decoded.role,
       created_at: '',
       updated_at: ''
-    }
+    };
+    console.log("getUserFromToken: Returning user:", user);
+    return user;
   } catch (error) {
     console.error('Error decoding token:', error)
     localStorage.removeItem('token')
@@ -69,8 +77,12 @@ export function isAdmin(): boolean {
     // Only run on client side
     if (typeof window === 'undefined') return false
     
+    console.log("isAdmin() called - checking user role...");
     const user = getUserFromToken()
-    return user?.role === 'admin'
+    console.log("User from token:", user);
+    const isAdminUser = user?.role === 'admin';
+    console.log("isAdmin result:", isAdminUser);
+    return isAdminUser;
   } catch (error) {
     console.error('Error in isAdmin check:', error)
     return false

@@ -1501,7 +1501,9 @@ export default function DeviceDetailsPage() {
           let userIsAdmin = false;
           if (typeof window !== 'undefined') {
             try {
+              console.log("Calling isAdmin() function...");
               userIsAdmin = isAdmin();
+              console.log("isAdmin() returned:", userIsAdmin);
               setIsAdminUser(userIsAdmin);
               console.log("Admin check result:", userIsAdmin);
               
@@ -1512,9 +1514,12 @@ export default function DeviceDetailsPage() {
                   const decoded = JSON.parse(atob(token.split('.')[1]));
                   console.log("Token payload:", decoded);
                   console.log("User role in token:", decoded.role);
+                  console.log("Expected admin role:", decoded.role === 'admin');
                 } catch (e) {
                   console.log("Could not decode token for debugging");
                 }
+              } else {
+                console.log("No token found in localStorage");
               }
               
               // Temporary admin bypass for testing (remove this in production)
@@ -1533,6 +1538,7 @@ export default function DeviceDetailsPage() {
           }
           
           // Fetch devices based on user role
+          console.log("About to fetch devices. userIsAdmin:", userIsAdmin, "isAdminUser:", isAdminUser);
           let devices;
           if (userIsAdmin) {
             console.log("Admin user - fetching all devices");
@@ -1584,6 +1590,7 @@ export default function DeviceDetailsPage() {
       
       try {
         // Use admin endpoint if user is admin, otherwise use regular endpoint
+        console.log("About to fetch latest device log. isAdminUser:", isAdminUser);
         if (isAdminUser) {
           console.log("Admin user - using admin endpoint for latest device log");
           try {
