@@ -9,12 +9,13 @@ import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { AlertCircle, Eye, Loader2, Plus, Trash2 } from "lucide-react"
-import { getUserDevices, claimDevice, deleteDevice, getLatestDeviceLog, registerDevice, APIError } from "@/lib/field-eyes-api"
+import { getUserDevices, claimDevice, deleteDevice, getLatestDeviceLog, registerDevice, APIError, getAllDevicesForAdmin, getLatestDeviceLogForAdmin } from "@/lib/field-eyes-api"
 import { transformDevices } from "@/lib/transformers"
 import { Device } from "@/types/field-eyes"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { isAdmin } from "@/lib/client-auth"
 
 export default function DevicesPage() {
   const [isAddDeviceOpen, setIsAddDeviceOpen] = useState(false)
@@ -25,6 +26,7 @@ export default function DevicesPage() {
   const [serialNumber, setSerialNumber] = useState("")
   const [deviceName, setDeviceName] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isAdminUser, setIsAdminUser] = useState(false)
   const { toast } = useToast()
   
   // Fetch devices
@@ -34,15 +36,41 @@ export default function DevicesPage() {
         setIsLoading(true)
         setError(null)
         
-        // Get devices from Field Eyes API
-        const rawDevices = await getUserDevices()
+        // Check if user is admin
+        let userIsAdmin = false;
+        if (typeof window !== 'undefined') {
+          try {
+            userIsAdmin = isAdmin();
+            setIsAdminUser(userIsAdmin);
+          } catch (error) {
+            console.error("Error checking admin status:", error);
+          }
+        }
+        
+        // Get devices from Field Eyes API based on user role
+        let rawDevices;
+        if (userIsAdmin) {
+          console.log("Admin user - fetching all devices");
+          rawDevices = await getAllDevicesForAdmin();
+        } else {
+          console.log("Regular user - fetching user devices");
+          rawDevices = await getUserDevices();
+        }
         const transformedDevices = transformDevices(rawDevices)
         
         // For each device, fetch the latest readings to get status information
         const devicesWithReadings = await Promise.all(
           transformedDevices.map(async (device) => {
             try {
-              const latestReading = await getLatestDeviceLog(device.serial_number)
+              // Use admin endpoint if user is admin, otherwise use regular endpoint
+              let latestReading;
+              if (userIsAdmin) {
+                console.log("Admin user - using admin endpoint for latest device log");
+                latestReading = await getLatestDeviceLogForAdmin(device.serial_number);
+              } else {
+                console.log("Regular user - using regular endpoint for latest device log");
+                latestReading = await getLatestDeviceLog(device.serial_number);
+              }
               
               // Determine device status based on latest reading timestamp
               const now = new Date()
@@ -197,7 +225,12 @@ export default function DevicesPage() {
       setIsAddDeviceOpen(false)
       
       // Refresh the devices list
-      const rawDevices = await getUserDevices()
+      let rawDevices;
+      if (isAdminUser) {
+        rawDevices = await getAllDevicesForAdmin();
+      } else {
+        rawDevices = await getUserDevices();
+      }
       console.log("Raw devices after claiming:", rawDevices);
       const transformedDevices = transformDevices(rawDevices)
       console.log("Transformed devices after claiming:", transformedDevices);
@@ -255,7 +288,14 @@ export default function DevicesPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Devices</h1>
-          <p className="text-muted-foreground">Manage and monitor your soil sensing devices</p>
+          <p className="text-muted-foreground">
+            Manage and monitor your soil sensing devices
+            {isAdminUser && (
+              <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                Admin Mode
+              </span>
+            )}
+          </p>
         </div>
         <Dialog open={isAddDeviceOpen} onOpenChange={setIsAddDeviceOpen}>
           <DialogTrigger asChild>
