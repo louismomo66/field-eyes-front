@@ -159,58 +159,6 @@ import {
   
   export async function getDeviceLogs(serialNumber: string): Promise<SoilReading[]> {
     const logs = await fetchAPI<SoilReading[]>(`/get-device-logs?serial_number=${serialNumber}`);
-    
-    // WORKAROUND: Fix for backend Redis caching bug that drops electrical_conductivity values
-    if (logs && logs.length > 0) {
-      // Get the latest log to check if we need to apply a fix
-      const latestLog = await getLatestDeviceLog(serialNumber).catch(() => null);
-      
-      // Check if the latest log has EC data
-      const hasLatestEC = latestLog && 
-                         latestLog.electrical_conductivity !== undefined && 
-                         latestLog.electrical_conductivity > 0;
-      
-      if (hasLatestEC) {
-        console.log("Applying comprehensive EC data fix for historical logs");
-        
-        // Count logs with missing EC data
-        const logsWithoutEC = logs.filter(log => 
-          !log.electrical_conductivity || log.electrical_conductivity === 0
-        ).length;
-        
-        if (logsWithoutEC > 0) {
-          console.log(`Found ${logsWithoutEC} of ${logs.length} logs missing EC data`);
-          
-          // For logs with the same timestamp as latest log, use exact EC value
-          // For other logs, ensure they have at least a minimal EC value
-          logs.forEach(log => {
-            if (log.created_at === latestLog.created_at) {
-              // Use the exact value from the latest log for logs with matching timestamp
-              log.electrical_conductivity = latestLog.electrical_conductivity;
-              log.ec = latestLog.electrical_conductivity; // Also set the ec alias
-            } 
-            else if (!log.electrical_conductivity || log.electrical_conductivity === 0) {
-              // For historical logs, set a random value between 0.01 and the latest value
-              // This creates more natural-looking historical data rather than flat lines
-              const maxValue = Math.min(latestLog.electrical_conductivity, 2.0);
-              const minValue = 0.01;
-              const randomEC = minValue + Math.random() * (maxValue - minValue);
-              log.electrical_conductivity = parseFloat(randomEC.toFixed(4));
-              log.ec = log.electrical_conductivity; // Also set the ec alias
-            }
-          });
-          
-          console.log("Applied EC data fix, sample values:", logs.slice(0, 3).map(l => ({
-            id: l.id,
-            timestamp: l.created_at,
-            ec: l.electrical_conductivity
-          })));
-        }
-      } else {
-        console.log("Latest log doesn't have EC data, cannot apply fix");
-      }
-    }
-    
     return logs;
   }
   
@@ -347,6 +295,65 @@ export async function getLatestDeviceLogForAdmin(serialNumber: string): Promise<
     return result
   } catch (error) {
     console.error(`Error in getLatestDeviceLogForAdmin for ${serialNumber}:`, error)
+    throw error
+  }
+}
+
+// Download device data as CSV
+export async function downloadDeviceData(
+  deviceId: number, 
+  startDate?: string, 
+  endDate?: string
+): Promise<void> {
+  const token = getToken()
+  if (!token) {
+    throw new Error('No authentication token found')
+  }
+
+  let url = `${API_URL}/admin/download-device-data?device_id=${deviceId}`
+  if (startDate) url += `&start_date=${encodeURIComponent(startDate)}`
+  if (endDate) url += `&end_date=${encodeURIComponent(endDate)}`
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new APIError(
+        errorData.message || `Download failed: ${response.status} ${response.statusText}`,
+        response.status,
+        response.statusText,
+        errorData
+      )
+    }
+
+    // Get the filename from the Content-Disposition header
+    const contentDisposition = response.headers.get('Content-Disposition')
+    let filename = 'device_data.csv'
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="(.+)"/)
+      if (filenameMatch) {
+        filename = filenameMatch[1]
+      }
+    }
+
+    // Create a blob and download it
+    const blob = await response.blob()
+    const downloadUrl = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = downloadUrl
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(downloadUrl)
+  } catch (error) {
+    console.error('Error downloading device data:', error)
     throw error
   }
 } 

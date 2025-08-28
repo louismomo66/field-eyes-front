@@ -68,22 +68,14 @@ export function transformSoilReading(reading: SoilReading): SoilReading {
     }
   }
   
-  // Special handling to preserve very low EC values that might be rounded to 0
-  // Some devices report very low but non-zero readings (like 0.001)
-  if (ecValue !== null && ecValue >= 0 && ecValue < 0.01) {
-    // Set to minimum visible value to ensure it shows on the chart
-    ecValue = 0.01;
-  }
-  
   // Set both ec and electrical_conductivity to the same value
   if (ecValue !== null) {
     uiReading.ec = ecValue;
     uiReading.electrical_conductivity = ecValue;
   } else {
-    // Default both to a small value (not 0) if no valid value was found
-    // Using 0.01 instead of 0 ensures the points are visible on the chart
-    uiReading.ec = 0.01;
-    uiReading.electrical_conductivity = 0.01;
+    // Default both to 0 if no valid value was found
+    uiReading.ec = 0;
+    uiReading.electrical_conductivity = 0;
   }
   
   // Process other fields

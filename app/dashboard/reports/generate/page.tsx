@@ -441,6 +441,7 @@ export default function GenerateReportPage() {
       'CreatedAt',               // Created timestamp (alternative)
       'serial_number',           // Device ID
       'electrical_conductivity', // EC (primary field)
+      'ElectricalConductivity',  // EC (uppercase field)
       'ec',                      // EC (alias)
       'soil_moisture',           // Soil moisture
       'moisture',                // Moisture alias
@@ -516,11 +517,11 @@ export default function GenerateReportPage() {
           }
         }
         
-        // Format numbers
+        // Format numbers (except EC which should remain raw)
         if (typeof value === 'number') {
-          // Use 4 decimal places for EC values for higher precision
-          if (field === 'ec' || field === 'electrical_conductivity') {
-            return value.toFixed(4);
+          // Keep EC values as raw numbers without formatting
+          if (field === 'ec' || field === 'electrical_conductivity' || field === 'ElectricalConductivity') {
+            return value.toString();
           }
           // Use 2 decimal places for other numerical values
           return value.toFixed(2);

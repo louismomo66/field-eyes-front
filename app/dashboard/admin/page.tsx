@@ -7,10 +7,10 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { getAllDevicesForAdmin, getDeviceLogsForAdmin, getLatestDeviceLogForAdmin } from "@/lib/field-eyes-api"
+import { getAllDevicesForAdmin, getDeviceLogsForAdmin, getLatestDeviceLogForAdmin, downloadDeviceData } from "@/lib/field-eyes-api"
 import { isAdmin } from "@/lib/client-auth"
 import { Device, SoilReading } from "@/types/field-eyes"
-import { Search, Eye, Users, Cpu, Database, Calendar, Info, RefreshCw } from "lucide-react"
+import { Search, Eye, Users, Cpu, Database, Calendar, Info, RefreshCw, Download } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useRouter } from "next/navigation"
 import {
@@ -41,11 +41,12 @@ export default function AdminPage() {
   const [logsLoading, setLogsLoading] = useState(false)
   const [logsDialogOpen, setLogsDialogOpen] = useState(false)
   const [dateRange, setDateRange] = useState("30days")
-  const [deviceLastActivity, setDeviceLastActivity] = useState<Record<number, Date>>({})
+  const [deviceLastActivity, setDeviceLastActivity] = useState<Record<string | number, Date>>({})
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
   const [refreshing, setRefreshing] = useState<boolean>(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [logsPerPage] = useState(100)
+  const [downloading, setDownloading] = useState(false)
   const router = useRouter()
 
   const [isAdminUser, setIsAdminUser] = useState(false)
@@ -153,7 +154,7 @@ export default function AdminPage() {
   // Fetch the latest log for each device to determine activity status
   const fetchDeviceActivity = async (devicesList: Device[]) => {
     // Create a new activity map to avoid any potential issues with shared references
-    const activityMap: Record<number, Date> = {}
+    const activityMap: Record<string | number, Date> = {}
     
     try {
       console.log(`Fetching activity for ${devicesList.length} devices...`)
@@ -313,6 +314,47 @@ export default function AdminPage() {
     }
   }
 
+  const handleDownloadDeviceData = async (device: Device) => {
+    try {
+      setDownloading(true)
+      
+      // Calculate date range based on current selection
+      let startDate: string | undefined
+      let endDate: string | undefined
+      
+      if (dateRange !== 'all') {
+        endDate = new Date().toISOString().split('T')[0] // YYYY-MM-DD format
+        let days: number
+        
+        if (dateRange === '1day') {
+          days = 1
+        } else {
+          days = parseInt(dateRange.replace('days', '')) || 30
+        }
+        
+        const start = new Date()
+        start.setDate(start.getDate() - days)
+        startDate = start.toISOString().split('T')[0] // YYYY-MM-DD format
+      }
+      
+      await downloadDeviceData(device.id, startDate, endDate)
+      
+      toast({
+        title: "Success",
+        description: `Device data for ${device.name || device.serial_number} downloaded successfully.`,
+      })
+    } catch (error: any) {
+      console.error("Error downloading device data:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to download device data. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setDownloading(false)
+    }
+  }
+
   const getDeviceStatus = (device: Device) => {
     // Get the device ID (handle both uppercase and lowercase)
     const deviceId = (device as any).ID || device.id || `serial-${device.serial_number}`
@@ -438,7 +480,7 @@ export default function AdminPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {devices.filter(d => getDeviceStatus(d) === 'Active').length}
+              {devices.filter(d => getDeviceStatus(d) === 'active').length}
             </div>
           </CardContent>
         </Card>
@@ -590,15 +632,26 @@ export default function AdminPage() {
                       </TableCell>
                       <TableCell>{formatDate(device.created_at)}</TableCell>
                       <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => fetchDeviceLogs(device)}
-                          disabled={logsLoading}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View Logs
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => fetchDeviceLogs(device)}
+                            disabled={logsLoading}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View Logs
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownloadDeviceData(device)}
+                            disabled={downloading}
+                          >
+                            <Download className="h-4 w-4 mr-1" />
+                            {downloading ? 'Downloading...' : 'Download'}
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -638,6 +691,16 @@ export default function AdminPage() {
                <RefreshCw className={`h-4 w-4 ${logsLoading ? 'animate-spin' : ''}`} />
                Refresh
              </Button>
+             <Button
+               variant="outline"
+               size="sm"
+               onClick={() => selectedDevice && handleDownloadDeviceData(selectedDevice)}
+               disabled={downloading || !selectedDevice}
+               className="flex items-center gap-2"
+             >
+               <Download className={`h-4 w-4 ${downloading ? 'animate-spin' : ''}`} />
+               {downloading ? 'Downloading...' : 'Download CSV'}
+             </Button>
              <div className="text-sm text-gray-600">
                {deviceLogs.length} total logs for {dateRangePresets[dateRange as keyof typeof dateRangePresets]}
              </div>
@@ -656,10 +719,10 @@ export default function AdminPage() {
                     <TableHead>Humidity (%)</TableHead>
                     <TableHead>Soil Moisture (%)</TableHead>
                     <TableHead>pH</TableHead>
-                    <TableHead>N (%)</TableHead>
-                    <TableHead>P (%)</TableHead>
-                    <TableHead>K (%)</TableHead>
-                    <TableHead>EC (mS/cm)</TableHead>
+                    <TableHead>N (mg/kg)</TableHead>
+                    <TableHead>P (mg/kg)</TableHead>
+                    <TableHead>K (mg/kg)</TableHead>
+                    <TableHead>EC (Raw)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -679,10 +742,10 @@ export default function AdminPage() {
                         <TableCell>{log.humidity?.toFixed(1) || "—"}</TableCell>
                         <TableCell>{log.soil_moisture?.toFixed(1) || "—"}</TableCell>
                         <TableCell>{log.ph?.toFixed(2) || "—"}</TableCell>
-                        <TableCell>{log.nitrogen?.toFixed(2) || "—"}</TableCell>
-                        <TableCell>{log.phosphorous?.toFixed(2) || "—"}</TableCell>
-                        <TableCell>{log.potassium?.toFixed(2) || "—"}</TableCell>
-                        <TableCell>{log.electrical_conductivity?.toFixed(2) || "—"}</TableCell>
+                        <TableCell>{log.nitrogen ? log.nitrogen.toFixed(0) : "—"}</TableCell>
+                        <TableCell>{log.phosphorous ? log.phosphorous.toFixed(0) : "—"}</TableCell>
+                        <TableCell>{log.potassium ? log.potassium.toFixed(0) : "—"}</TableCell>
+                        <TableCell>{log.electrical_conductivity !== undefined ? log.electrical_conductivity : "—"}</TableCell>
                       </TableRow>
                     ))
                   )}
