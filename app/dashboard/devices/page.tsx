@@ -103,6 +103,7 @@ export default function DevicesPage() {
           })
         )
         
+        console.log("Final devices with readings:", devicesWithReadings);
         setDevices(devicesWithReadings)
         setIsLoading(false)
       } catch (err) {
@@ -429,7 +430,7 @@ export default function DevicesPage() {
                   <TableCell className="text-right w-1/6">
                     <div className="flex justify-end gap-1">
                       <Button variant="outline" size="sm" asChild>
-                        <Link href={`/dashboard/devices/${device.serial_number}`}>
+                        <Link href={`/dashboard/devices/${device.serial_number}`} onClick={() => console.log("Navigating to device:", device.serial_number)}>
                           <Eye className="h-4 w-4" />
                         </Link>
                       </Button>

@@ -1,8 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  basePath: '/app',
-  assetPrefix: '/app',
+  // Only use basePath in production, not in development
+  ...(process.env.NODE_ENV === 'production' ? {
+    basePath: '/app',
+    assetPrefix: '/app',
+  } : {}),
   eslint: {
     ignoreDuringBuilds: true,
   },
