@@ -253,33 +253,11 @@ export async function getDeviceLogsForAdmin(
 }
 
 export async function getLatestDeviceLogForAdmin(serialNumber: string): Promise<SoilReading> {
-  // Try using the admin-specific endpoint with latest_only=true parameter
   console.log(`Admin requesting latest log for device ${serialNumber}`)
   try {
-    // First try the admin endpoint with latest_only=true
-    const logs = await getDeviceLogsForAdmin(serialNumber, undefined, undefined, true)
-    console.log(`Admin received logs for ${serialNumber}:`, logs ? {
-      count: logs.length,
-      firstLog: logs.length > 0 ? {
-        id: logs[0].id,
-        created_at: logs[0].created_at,
-        serial_number: logs[0].serial_number
-      } : 'No logs'
-    } : 'No data')
-    
-    if (logs && logs.length > 0) {
-      // Verify the log belongs to the requested device
-      if (logs[0].serial_number && logs[0].serial_number !== serialNumber) {
-        console.error(`Mismatch in getLatestDeviceLogForAdmin: Log serial ${logs[0].serial_number} doesn't match requested ${serialNumber}`)
-        throw new Error(`Log serial number mismatch: ${logs[0].serial_number} vs ${serialNumber}`)
-      }
-      return logs[0]
-    }
-    
-    // If no logs from admin endpoint, try the regular endpoint as fallback
-    console.log(`Falling back to regular endpoint for ${serialNumber}`)
-    const result = await fetchAPI<SoilReading>(`/latest-device-log?serial_number=${serialNumber}`)
-    console.log(`Regular endpoint result for ${serialNumber}:`, result ? {
+    // Use the dedicated admin endpoint for latest device log
+    const result = await fetchAPI<SoilReading>(`/admin/latest-device-log?serial_number=${serialNumber}`)
+    console.log(`Admin latest log result for ${serialNumber}:`, result ? {
       id: result.id,
       created_at: result.created_at,
       serial_number: result.serial_number,
@@ -288,7 +266,7 @@ export async function getLatestDeviceLogForAdmin(serialNumber: string): Promise<
     
     // Verify the log belongs to the requested device
     if (result && result.serial_number && result.serial_number !== serialNumber) {
-      console.error(`Mismatch in getLatestDeviceLogForAdmin fallback: Log serial ${result.serial_number} doesn't match requested ${serialNumber}`)
+      console.error(`Mismatch in getLatestDeviceLogForAdmin: Log serial ${result.serial_number} doesn't match requested ${serialNumber}`)
       throw new Error(`Log serial number mismatch: ${result.serial_number} vs ${serialNumber}`)
     }
     

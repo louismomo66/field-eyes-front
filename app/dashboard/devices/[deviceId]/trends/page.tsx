@@ -19,7 +19,7 @@ import {
   Tooltip,
   Legend
 } from "recharts"
-import { getDeviceLogs, getLatestDeviceLog } from "@/lib/field-eyes-api"
+import { getDeviceLogs, getLatestDeviceLog, getDeviceLogsForAdmin, getLatestDeviceLogForAdmin } from "@/lib/field-eyes-api"
 import { transformSoilReading } from "@/lib/transformers"
 import { SoilReading } from "@/types/field-eyes"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -27,6 +27,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { format, addDays } from "date-fns"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { isAdmin } from "@/lib/client-auth"
 
 // Interface for parameter metadata
 interface ParamMeta {
@@ -342,6 +343,7 @@ export default function DeviceTrendsPage() {
   const [endDate, setEndDate] = useState<Date | undefined>(undefined)
   const [selectedPreset, setSelectedPreset] = useState<string>("all")
   const [allLogs, setAllLogs] = useState<any[]>([])
+  const [isAdminUser, setIsAdminUser] = useState(false)
 
   // Debug function to help track EC data issues
   const debugEcData = () => {
@@ -535,9 +537,27 @@ export default function DeviceTrendsPage() {
       try {
         setIsLoading(true);
         
-        // Fetch device logs
-        console.log(`Fetching device logs for device ID: ${deviceId}`);
-        const logs = await getDeviceLogs(deviceId);
+        // Check if user is admin
+        let userIsAdmin = false;
+        if (typeof window !== 'undefined') {
+          try {
+            userIsAdmin = isAdmin();
+            setIsAdminUser(userIsAdmin);
+          } catch (error) {
+            console.error("Error checking admin status:", error);
+          }
+        }
+        
+        // Fetch device logs based on user role
+        console.log(`Fetching device logs for device ID: ${deviceId} (Admin: ${userIsAdmin})`);
+        let logs;
+        if (userIsAdmin) {
+          console.log("Admin user - using admin endpoint for device logs");
+          logs = await getDeviceLogsForAdmin(deviceId);
+        } else {
+          console.log("Regular user - using regular endpoint for device logs");
+          logs = await getDeviceLogs(deviceId);
+        }
         
         if (!logs || logs.length === 0) {
           console.error("No logs returned from API");
@@ -594,7 +614,15 @@ export default function DeviceTrendsPage() {
           console.warn("No EC data found in device logs, attempting to fetch latest log directly");
           
           try {
-            const latestLog = await getLatestDeviceLog(deviceId);
+            // Use admin endpoint if user is admin, otherwise use regular endpoint
+            let latestLog;
+            if (userIsAdmin) {
+              console.log("Admin user - using admin endpoint for latest device log");
+              latestLog = await getLatestDeviceLogForAdmin(deviceId);
+            } else {
+              console.log("Regular user - using regular endpoint for latest device log");
+              latestLog = await getLatestDeviceLog(deviceId);
+            }
             console.log("Latest log retrieved directly:", latestLog);
             
             // Check if it has EC data
@@ -806,6 +834,11 @@ export default function DeviceTrendsPage() {
             Back to Device
         </Button>
           <h1 className="text-2xl font-bold">Parameter Trends</h1>
+          {isAdminUser && (
+            <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              Admin Mode
+            </span>
+          )}
           </div>
         
         {/* Compact date range picker in top right */}

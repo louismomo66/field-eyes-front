@@ -29,7 +29,7 @@ import {
   ClipboardList,
   RefreshCw,
 } from "lucide-react"
-import { getLatestDeviceLog, getDeviceLogs, getUserDevices, updateDeviceName } from "@/lib/field-eyes-api"
+import { getLatestDeviceLog, getDeviceLogs, getUserDevices, updateDeviceName, getAllDevicesForAdmin, getLatestDeviceLogForAdmin, getDeviceLogsForAdmin } from "@/lib/field-eyes-api"
 import { transformSoilReading } from "@/lib/transformers"
 import { SoilReading } from "@/types/field-eyes"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -40,6 +40,7 @@ import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
 import { Device } from "@/types/field-eyes"
 import { cn } from "@/lib/utils"
+import { isAdmin } from "@/lib/client-auth"
 
 // Donut chart component for visualizing readings
 interface DonutChartProps {
@@ -1424,6 +1425,7 @@ export default function DeviceDetailsPage() {
   const [deviceAlerts, setDeviceAlerts] = useState<DeviceAlertItem[]>([])
   const [isEditingName, setIsEditingName] = useState(false)
   const [newName, setNewName] = useState("")
+  const [isAdminUser, setIsAdminUser] = useState(false)
   const { toast } = useToast()
   
   // Use refs to minimize re-renders
@@ -1487,11 +1489,31 @@ export default function DeviceDetailsPage() {
       
       setError(null)
       
-      // Get device details to get the proper name
+      // Check if user is admin and get device details
       let deviceDetails = null;
       if (!deviceInfo) {
         try {
-          const devices = await getUserDevices();
+          // Check if user is admin
+          let userIsAdmin = false;
+          if (typeof window !== 'undefined') {
+            try {
+              userIsAdmin = isAdmin();
+              setIsAdminUser(userIsAdmin);
+            } catch (error) {
+              console.error("Error checking admin status:", error);
+            }
+          }
+          
+          // Fetch devices based on user role
+          let devices;
+          if (userIsAdmin) {
+            console.log("Admin user - fetching all devices");
+            devices = await getAllDevicesForAdmin();
+          } else {
+            console.log("Regular user - fetching user devices");
+            devices = await getUserDevices();
+          }
+          
           console.log("Device list for detail page:", devices);
           deviceDetails = devices.find(d => d.serial_number === deviceId);
           console.log(`Found device details for ${deviceId}:`, deviceDetails);
@@ -1517,7 +1539,15 @@ export default function DeviceDetailsPage() {
       let diffMins = Infinity;
       
       try {
-        latestReading = await getLatestDeviceLog(deviceId)
+        // Use admin endpoint if user is admin, otherwise use regular endpoint
+        let latestReading;
+        if (isAdminUser) {
+          console.log("Admin user - using admin endpoint for latest device log");
+          latestReading = await getLatestDeviceLogForAdmin(deviceId);
+        } else {
+          console.log("Regular user - using regular endpoint for latest device log");
+          latestReading = await getLatestDeviceLog(deviceId);
+        }
         transformedReading = transformSoilReading(latestReading)
         
         // Determine device status based on latest reading timestamp
@@ -1885,6 +1915,11 @@ export default function DeviceDetailsPage() {
           ) : (
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold">{deviceInfo.name}</h1>
+              {isAdminUser && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  Admin Mode
+                </span>
+              )}
               <Button variant="ghost" size="sm" onClick={handleEditName} className="h-8 w-8 p-0">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />

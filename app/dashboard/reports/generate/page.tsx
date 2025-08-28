@@ -16,12 +16,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
 import { format as formatDate, subDays, subMonths } from "date-fns"
-import { getUserDevices, registerDevice, claimDevice } from "@/lib/field-eyes-api"
+import { getUserDevices, registerDevice, claimDevice, getAllDevicesForAdmin } from "@/lib/field-eyes-api"
 import { generateReport, getDevice } from "@/lib/api"
 import { transformDevices } from "@/lib/transformers"
 import type { Device, ReportData, BasicSoilAnalysisReport } from "@/types"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { isAdmin } from "@/lib/client-auth"
 
 export default function GenerateReportPage() {
   const router = useRouter()
@@ -39,15 +40,38 @@ export default function GenerateReportPage() {
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [csvData, setCsvData] = useState<any[]>([])
   const [deviceSearch, setDeviceSearch] = useState("")
+  const [isAdminUser, setIsAdminUser] = useState(false)
 
-  // Fetch devices when component mounts
+  // Check admin status and fetch devices when component mounts
   useEffect(() => {
-    const fetchDevicesData = async () => {
+    const checkAdminAndFetchDevices = async () => {
       try {
         setIsLoading(true)
         setError(null)
-        console.log("Fetching devices...")
-        const data = await getUserDevices()
+        
+        // Check if user is admin
+        let userIsAdmin = false
+        if (typeof window !== 'undefined') {
+          try {
+            userIsAdmin = isAdmin()
+            setIsAdminUser(userIsAdmin)
+          } catch (error) {
+            console.error("Error checking admin status:", error)
+          }
+        }
+        
+        console.log("Fetching devices... User is admin:", userIsAdmin)
+        
+        // Fetch devices based on user role
+        let data
+        if (userIsAdmin) {
+          console.log("Fetching all devices for admin...")
+          data = await getAllDevicesForAdmin()
+        } else {
+          console.log("Fetching user devices...")
+          data = await getUserDevices()
+        }
+        
         console.log("Devices received:", data)
         
         // Transform devices using the helper function
@@ -75,7 +99,7 @@ export default function GenerateReportPage() {
       }
     }
 
-    fetchDevicesData()
+    checkAdminAndFetchDevices()
   }, [])
 
   // Update date range when preset is selected
@@ -553,7 +577,14 @@ export default function GenerateReportPage() {
             </Button> */}
             <div>
               <h1 className="text-2xl font-bold tracking-tight">Generate Report</h1>
-              <p className="text-muted-foreground">Create a report based on your soil monitoring data</p>
+              <p className="text-muted-foreground">
+                Create a report based on your soil monitoring data
+                {isAdminUser && (
+                  <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    Admin Mode
+                  </span>
+                )}
+              </p>
             </div>
           </div>
 
@@ -574,7 +605,9 @@ export default function GenerateReportPage() {
                     <span className="text-sm">Loading devices...</span>
                   </div>
                 ) : devices.length === 0 ? (
-                  <div className="text-muted-foreground p-4 border rounded-md">No devices available</div>
+                  <div className="text-muted-foreground p-4 border rounded-md">
+                    {isAdminUser ? "No devices available in the system" : "No devices available"}
+                  </div>
                 ) : (
                   <div className="space-y-4">
                     {/* Device selection dropdown */}
@@ -656,9 +689,16 @@ export default function GenerateReportPage() {
                 <p className="text-sm text-muted-foreground mt-2">
                   {isLoading ? "Retrieving your devices..." :
                    selectedDevices.length === 0
-                    ? "Select a device to generate a report"
+                    ? `Select a device to generate a report${isAdminUser ? ` (${devices.length} total devices available)` : ''}`
                     : `Report will focus on data from the selected devices`}
                 </p>
+                {isAdminUser && (
+                  <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                    <p className="text-sm text-blue-700">
+                      <strong>Admin Mode:</strong> You can generate reports for all devices in the system.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-4">
