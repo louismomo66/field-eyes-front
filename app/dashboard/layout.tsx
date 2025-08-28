@@ -36,10 +36,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     // Create a global error handler to catch unauthorized errors
     const handleGlobalErrors = (event: ErrorEvent) => {
+      console.log("Global error caught:", event.error?.message);
       if (
         event.error?.message?.includes("unauthorized") || 
         event.error?.message?.includes("invalid or missing token")
       ) {
+        console.log("Unauthorized error detected, but checking if it's a recoverable error...");
+        
+        // Don't logout immediately for admin-related errors
+        if (event.error?.message?.includes("admin") || 
+            event.error?.message?.includes("device does not belong to the user")) {
+          console.log("Admin-related error detected, not logging out immediately");
+          return;
+        }
+        
         console.log("Unauthorized error detected, redirecting to login")
         handleLogout()
       }

@@ -1474,6 +1474,10 @@ export default function DeviceDetailsPage() {
 
   // Function to fetch device data
   const fetchDeviceData = async (silentRefresh = false) => {
+    console.log("=== fetchDeviceData called ===");
+    console.log("deviceId:", deviceId);
+    console.log("silentRefresh:", silentRefresh);
+    
     if (!deviceId) return
     
     try {
@@ -1519,6 +1523,10 @@ export default function DeviceDetailsPage() {
                 userIsAdmin = true;
                 setIsAdminUser(true);
               }
+              
+              // Additional debugging for admin status
+              console.log("Final admin status:", userIsAdmin);
+              console.log("Current URL:", window.location.href);
             } catch (error) {
               console.error("Error checking admin status:", error);
             }
@@ -1529,12 +1537,21 @@ export default function DeviceDetailsPage() {
           if (userIsAdmin) {
             console.log("Admin user - fetching all devices");
             try {
+              console.log("Calling getAllDevicesForAdmin...");
               devices = await getAllDevicesForAdmin();
               console.log("Successfully fetched all devices for admin:", devices);
             } catch (adminError) {
               console.error("Admin endpoint failed, falling back to regular endpoint:", adminError);
+              console.error("Error details:", adminError);
               // Fallback to regular endpoint if admin endpoint fails
-              devices = await getUserDevices();
+              try {
+                console.log("Falling back to getUserDevices...");
+                devices = await getUserDevices();
+                console.log("Fallback successful:", devices);
+              } catch (fallbackError) {
+                console.error("Fallback also failed:", fallbackError);
+                throw fallbackError;
+              }
             }
           } else {
             console.log("Regular user - fetching user devices");
@@ -1570,12 +1587,21 @@ export default function DeviceDetailsPage() {
         if (isAdminUser) {
           console.log("Admin user - using admin endpoint for latest device log");
           try {
+            console.log("Calling getLatestDeviceLogForAdmin for deviceId:", deviceId);
             latestReading = await getLatestDeviceLogForAdmin(deviceId);
             console.log("Successfully fetched latest reading for admin:", latestReading);
           } catch (adminError) {
             console.error("Admin endpoint failed, falling back to regular endpoint:", adminError);
+            console.error("Error details:", adminError);
             // Fallback to regular endpoint if admin endpoint fails
-            latestReading = await getLatestDeviceLog(deviceId);
+            try {
+              console.log("Falling back to getLatestDeviceLog...");
+              latestReading = await getLatestDeviceLog(deviceId);
+              console.log("Fallback successful:", latestReading);
+            } catch (fallbackError) {
+              console.error("Fallback also failed:", fallbackError);
+              throw fallbackError;
+            }
           }
         } else {
           console.log("Regular user - using regular endpoint for latest device log");

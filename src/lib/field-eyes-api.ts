@@ -53,14 +53,32 @@ import {
         
         // Handle unauthorized errors specifically (401)
         if (response.status === 401) {
-          // Handle token expiration
-          handleTokenExpiration()
-          throw new APIError(
-            'Session expired. Please log in again.',
-            response.status,
-            response.statusText,
-            errorData
-          )
+          // Check if this is a token expiration or an admin access issue
+          const errorMessage = errorData.message || '';
+          console.log("401 error received:", errorMessage);
+          
+          // Only handle as token expiration if it's explicitly about token issues
+          if (errorMessage.includes("invalid or missing token") || 
+              errorMessage.includes("token expired") ||
+              errorMessage.includes("unauthorized: invalid or missing token")) {
+            console.log("Token expiration detected, logging out");
+            handleTokenExpiration()
+            throw new APIError(
+              'Session expired. Please log in again.',
+              response.status,
+              response.statusText,
+              errorData
+            )
+          } else {
+            // This might be an admin access issue or other authorization problem
+            console.log("401 error but not token expiration, throwing regular error");
+            throw new APIError(
+              errorMessage || `API error: ${response.status} ${response.statusText}`,
+              response.status,
+              response.statusText,
+              errorData
+            )
+          }
         }
         
         // Create a proper error object with all relevant information
