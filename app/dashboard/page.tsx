@@ -6,11 +6,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 // Note: Overview component removed as it's not used in current dashboard layout
 // Note: RecentReadings component removed as it's not used in current dashboard layout
 import { SoilHealthIndicator } from "@/components/dashboard/soil-health-indicator"
-import { getUserDevices, getLatestDeviceLog } from "@/lib/field-eyes-api"
+import { getUserDevices, getLatestDeviceLog, getLatestDeviceLogForAdmin } from "@/lib/field-eyes-api"
 import { transformDevices, transformSoilReadings } from "@/lib/transformers"
 import type { Device as FieldEyesDevice, SoilReading as FieldEyesSoilReading } from "@/types/field-eyes"
 import type { Device as IndexDevice, SoilReading as IndexSoilReading } from "@/types"
 import dynamic from 'next/dynamic'
+import { isAdmin } from "@/lib/client-auth"
 import { Skeleton } from "@/components/ui/skeleton"
 
 // Dashboard loading skeleton component
@@ -209,7 +210,9 @@ export default function DashboardPage() {
         // Revalidate in background (non-blocking)
         setTimeout(async () => {
           try {
-            const reading = await getLatestDeviceLog(serialNumber);
+            const reading = isAdmin() 
+              ? await getLatestDeviceLogForAdmin(serialNumber)
+              : await getLatestDeviceLog(serialNumber);
             const readings = reading ? [reading] : [];
             readingsCache.current.set(serialNumber, { data: readings, timestamp: now, isStale: false });
             addDebugEvent(`Background revalidation completed for device ${serialNumber}`);
@@ -223,7 +226,9 @@ export default function DashboardPage() {
 
       // Fetch new data if no cache or cache is too old
       addDebugEvent(`Fetching latest reading for device ${serialNumber}`);
-      const reading = await getLatestDeviceLog(serialNumber);
+      const reading = isAdmin() 
+        ? await getLatestDeviceLogForAdmin(serialNumber)
+        : await getLatestDeviceLog(serialNumber);
       addDebugEvent(`Got latest reading for device ${serialNumber}`);
       const readings = reading ? [reading] : [];
 
