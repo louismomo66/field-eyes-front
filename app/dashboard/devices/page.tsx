@@ -9,11 +9,10 @@ import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { AlertCircle, Eye, Loader2, Plus, Trash2 } from "lucide-react"
-import { getUserDevices, getAllDevicesForAdmin, claimDevice, deleteDevice, getLatestDeviceLog, getLatestDeviceLogForAdmin, registerDevice, APIError } from "@/lib/field-eyes-api"
+import { getUserDevices, claimDevice, deleteDevice, getLatestDeviceLog, registerDevice, APIError } from "@/lib/field-eyes-api"
 import { transformDevices } from "@/lib/transformers"
 import { Device } from "@/types/field-eyes"
 import { useToast } from "@/components/ui/use-toast"
-import { isAdmin } from "@/lib/client-auth"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
@@ -43,10 +42,7 @@ export default function DevicesPage() {
         const devicesWithReadings = await Promise.all(
           transformedDevices.map(async (device) => {
             try {
-              // Use admin endpoint if user is admin, otherwise use regular endpoint
-              const latestReading = isAdmin() 
-                ? await getLatestDeviceLogForAdmin(device.serial_number)
-                : await getLatestDeviceLog(device.serial_number)
+              const latestReading = await getLatestDeviceLog(device.serial_number)
               
               // Determine device status based on latest reading timestamp
               const now = new Date()

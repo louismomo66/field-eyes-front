@@ -1589,9 +1589,19 @@ export default function DeviceDetailsPage() {
       let diffMins = Infinity;
       
       try {
+        // Check if user is admin for this API call
+        let currentUserIsAdmin = isAdminUser;
+        if (typeof window !== 'undefined') {
+          try {
+            currentUserIsAdmin = isAdmin();
+          } catch (error) {
+            console.error("Error checking admin status for API call:", error);
+          }
+        }
+        
         // Use admin endpoint if user is admin, otherwise use regular endpoint
-        console.log("About to fetch latest device log. isAdminUser:", isAdminUser);
-        if (isAdminUser) {
+        console.log("About to fetch latest device log. currentUserIsAdmin:", currentUserIsAdmin, "isAdminUser:", isAdminUser);
+        if (currentUserIsAdmin) {
           console.log("Admin user - using admin endpoint for latest device log");
           try {
             console.log("Calling getLatestDeviceLogForAdmin for deviceId:", deviceId);
