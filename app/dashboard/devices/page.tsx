@@ -9,9 +9,10 @@ import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { AlertCircle, Eye, Loader2, Plus, Trash2 } from "lucide-react"
-import { getUserDevices, claimDevice, deleteDevice, getLatestDeviceLog, registerDevice, APIError } from "@/lib/field-eyes-api"
+import { getUserDevices, claimDevice, deleteDevice, getLatestDeviceLog, getLatestDeviceLogForAdmin, registerDevice, APIError, getAllDevicesForAdmin } from "@/lib/field-eyes-api"
 import { transformDevices } from "@/lib/transformers"
 import { Device } from "@/types/field-eyes"
+import { isAdmin } from "@/lib/client-auth"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -25,6 +26,7 @@ export default function DevicesPage() {
   const [serialNumber, setSerialNumber] = useState("")
   const [deviceName, setDeviceName] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isAdminUser, setIsAdminUser] = useState(false)
   const { toast } = useToast()
   
   // Fetch devices
@@ -34,15 +36,41 @@ export default function DevicesPage() {
         setIsLoading(true)
         setError(null)
         
-        // Get devices from Field Eyes API
-        const rawDevices = await getUserDevices()
+        // Check if user is admin
+        let userIsAdmin = false;
+        if (typeof window !== 'undefined') {
+          try {
+            userIsAdmin = isAdmin();
+            setIsAdminUser(userIsAdmin);
+          } catch (error) {
+            console.error("Error checking admin status:", error);
+          }
+        }
+        
+        // Get devices from Field Eyes API based on user role
+        console.log("Fetching devices for user. Admin:", userIsAdmin);
+        let rawDevices;
+        if (userIsAdmin) {
+          console.log("Admin user - fetching all devices");
+          rawDevices = await getAllDevicesForAdmin();
+        } else {
+          console.log("Regular user - fetching user devices");
+          rawDevices = await getUserDevices();
+        }
+        
         const transformedDevices = transformDevices(rawDevices)
         
         // For each device, fetch the latest readings to get status information
         const devicesWithReadings = await Promise.all(
           transformedDevices.map(async (device) => {
             try {
-              const latestReading = await getLatestDeviceLog(device.serial_number)
+              // Use admin endpoint if user is admin, otherwise use regular endpoint
+              let latestReading;
+              if (userIsAdmin) {
+                latestReading = await getLatestDeviceLogForAdmin(device.serial_number);
+              } else {
+                latestReading = await getLatestDeviceLog(device.serial_number);
+              }
               
               // Determine device status based on latest reading timestamp
               const now = new Date()
@@ -196,10 +224,15 @@ export default function DevicesPage() {
       setDeviceName("")
       setIsAddDeviceOpen(false)
       
-      // Refresh the devices list
-      const rawDevices = await getUserDevices()
-      console.log("Raw devices after claiming:", rawDevices);
-      const transformedDevices = transformDevices(rawDevices)
+      // Refresh the devices list using the appropriate endpoint
+      let refreshedRawDevices;
+      if (isAdminUser) {
+        refreshedRawDevices = await getAllDevicesForAdmin();
+      } else {
+        refreshedRawDevices = await getUserDevices();
+      }
+      console.log("Raw devices after claiming:", refreshedRawDevices);
+      const transformedDevices = transformDevices(refreshedRawDevices)
       console.log("Transformed devices after claiming:", transformedDevices);
       
       // Find the newly added device and ensure it has the name the user provided
@@ -254,8 +287,20 @@ export default function DevicesPage() {
     <div className="container mx-auto px-4">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Devices</h1>
-          <p className="text-muted-foreground">Manage and monitor your soil sensing devices</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight">Devices</h1>
+            {isAdminUser && (
+              <Badge className="bg-blue-100 text-blue-800 text-xs">
+                Admin Mode
+              </Badge>
+            )}
+          </div>
+          <p className="text-muted-foreground">
+            {isAdminUser 
+              ? "Manage and monitor all soil sensing devices in the system" 
+              : "Manage and monitor your soil sensing devices"
+            }
+          </p>
         </div>
         <Dialog open={isAddDeviceOpen} onOpenChange={setIsAddDeviceOpen}>
           <DialogTrigger asChild>
