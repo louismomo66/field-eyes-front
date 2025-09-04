@@ -224,9 +224,22 @@ export default function DevicesPage() {
       setDeviceName("")
       setIsAddDeviceOpen(false)
       
+      // Wait a moment for the backend to process the claim
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       // Refresh the devices list using the appropriate endpoint
       let refreshedRawDevices;
-      if (isAdminUser) {
+      // Check admin status directly instead of relying on state
+      let currentUserIsAdmin = false;
+      if (typeof window !== 'undefined') {
+        try {
+          currentUserIsAdmin = isAdmin();
+        } catch (error) {
+          console.error("Error checking admin status for refresh:", error);
+        }
+      }
+      
+      if (currentUserIsAdmin) {
         refreshedRawDevices = await getAllDevicesForAdmin();
       } else {
         refreshedRawDevices = await getUserDevices();
@@ -245,6 +258,28 @@ export default function DevicesPage() {
       });
       
       setDevices(updatedDevices)
+      
+      // If the device wasn't found in the refreshed list, try one more time after a longer delay
+      const foundDevice = updatedDevices.find(d => d.serial_number === serialNumber);
+      if (!foundDevice) {
+        console.log("Device not found in first refresh, trying again...");
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        let retryRawDevices;
+        if (currentUserIsAdmin) {
+          retryRawDevices = await getAllDevicesForAdmin();
+        } else {
+          retryRawDevices = await getUserDevices();
+        }
+        const retryTransformedDevices = transformDevices(retryRawDevices);
+        const retryUpdatedDevices = retryTransformedDevices.map(device => {
+          if (device.serial_number === serialNumber && nameToUse) {
+            return { ...device, name: nameToUse };
+          }
+          return device;
+        });
+        setDevices(retryUpdatedDevices);
+      }
     } catch (err) {
       console.error("Error claiming device:", err)
       toast({
