@@ -19,7 +19,7 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
-    domains: ['field-eyes.com', 'api.field-eyes.com'],
+    domains: ['field-eyes.com', 'agri.field-eyes.com'],
     unoptimized: process.env.NODE_ENV === 'development',
     remotePatterns: [
       {

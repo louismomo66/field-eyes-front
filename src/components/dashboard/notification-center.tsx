@@ -204,7 +204,16 @@ export function NotificationCenter({
       console.log(`Debug fetch with serial number: ${serialNumber}, device ID: ${deviceId}`);
       
       // Get the direct API URL
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:9002/api";
+      // Use relative path in production (nginx proxies /api/ to backend)
+      // Use localhost in development
+      let baseUrl = process.env.NEXT_PUBLIC_API_URL || 
+        (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+          ? '/api' 
+          : "http://localhost:9002/api");
+      // Normalize: if API URL points to api.field-eyes.com, use relative path instead
+      if (typeof window !== 'undefined' && baseUrl.includes('api.field-eyes.com')) {
+        baseUrl = '/api'
+      }
       const endpoint = serialNumber 
         ? `${baseUrl}/notifications?device_name=${serialNumber}`
         : deviceId 

@@ -12,7 +12,18 @@ import {
   import { getToken, setToken, removeToken, handleTokenExpiration } from "@/lib/auth"
   
   // Base API URL from environment variable
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:9002/api"
+  // Use relative path in production (nginx proxies /api/ to backend)
+  // Use localhost in development
+  // If env var points to api.field-eyes.com (invalid cert), use relative path instead
+  let API_URL = process.env.NEXT_PUBLIC_API_URL || 
+    (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+      ? '/api' 
+      : "http://localhost:9002/api")
+  
+  // Normalize: if API URL points to api.field-eyes.com, use relative path instead
+  if (typeof window !== 'undefined' && API_URL.includes('api.field-eyes.com')) {
+    API_URL = '/api'
+  }
   
   // Authentication headers helper
   const getAuthHeaders = () => {

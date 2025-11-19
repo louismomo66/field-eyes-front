@@ -60,7 +60,14 @@ function ResetPasswordForm() {
 
     try {
       setLoading(true)
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:9002/api"
+      let API_URL = process.env.NEXT_PUBLIC_API_URL || 
+        (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+          ? '/api' 
+          : "http://localhost:9002/api")
+      // Normalize: if API URL points to api.field-eyes.com, use relative path instead
+      if (typeof window !== 'undefined' && API_URL.includes('api.field-eyes.com')) {
+        API_URL = '/api'
+      }
       const response = await fetch(`${API_URL}/reset-password`, {
         method: "POST",
         headers: {
