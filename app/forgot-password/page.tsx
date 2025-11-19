@@ -7,9 +7,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Mail } from "lucide-react"
-
-// Helper function for asset paths
-const assetPath = (path: string) => `/app${path.startsWith('/') ? path : `/${path}`}`;
+import { getAssetPath, withBasePath } from "@/lib/utils"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
@@ -30,7 +28,8 @@ export default function ForgotPasswordPage() {
 
     try {
       setLoading(true)
-      const response = await fetch("http://localhost:9002/api/forgot-password", {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:9002/api"
+      const response = await fetch(`${API_URL}/forgot-password`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -48,7 +47,7 @@ export default function ForgotPasswordPage() {
 
       // Navigate to reset password page after a delay
       setTimeout(() => {
-        router.push(`/reset-password?email=${encodeURIComponent(email)}`)
+        router.push(withBasePath(`/reset-password?email=${encodeURIComponent(email)}`))
       }, 2000)
     } catch (err: any) {
       setError(err.message || "Failed to send reset instructions")
@@ -62,7 +61,7 @@ export default function ForgotPasswordPage() {
       {/* Background Image */}
       <div 
         className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: `url("${assetPath("/african-man-harvesting-vegetables 1.png")}")` }}
+        style={{ backgroundImage: `url("${getAssetPath("/african-man-harvesting-vegetables 1.png")}")` }}
       />
       
       {/* Overlay */}
@@ -76,7 +75,7 @@ export default function ForgotPasswordPage() {
             <div className="flex flex-col items-center space-y-2">
               <div className="h-20 w-40 relative">
                 <Image
-                  src={assetPath("/Sponsor.png")}
+                  src={getAssetPath("/Sponsor.png")}
                   alt="FieldEyes Logo"
                   fill
                   sizes="(max-width: 768px) 100vw, 160px"
@@ -136,7 +135,7 @@ export default function ForgotPasswordPage() {
                 </Button>
 
                 <p className="text-center text-sm">
-                  <Link href="/login" className="text-[#62A800] hover:text-[#4c8000] font-medium">
+                  <Link href={withBasePath("/login")} className="text-[#62A800] hover:text-[#4c8000] font-medium">
                     Back to Login
                   </Link>
                 </p>

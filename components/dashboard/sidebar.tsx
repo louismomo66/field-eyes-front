@@ -2,9 +2,9 @@ import Link from "next/link"
 import { useState, useEffect } from "react"
 import { Home, Cpu, FileText, Settings, Menu, LogOut, Shield } from "lucide-react"
 import { isAdmin } from "@/lib/client-auth"
+import { getAssetPath, withBasePath } from "@/lib/utils"
 
-// Helper function for asset paths
-const assetPath = (path: string) => `/app${path.startsWith('/') ? path : `/${path}`}`;
+const assetPath = getAssetPath
 
 interface SidebarProps {
   currentPath: string
@@ -139,7 +139,7 @@ export function Sidebar({ currentPath, className, onCollapse }: SidebarProps) {
         <button 
           onClick={() => {
             localStorage.removeItem("token");
-            window.location.href = "/app/login";
+            window.location.href = withBasePath("/login");
           }}
           className="w-full flex items-center justify-center gap-3 rounded-lg px-4 py-3 text-base font-medium text-gray-200 hover:bg-white/10 transition-all duration-200"
           style={{

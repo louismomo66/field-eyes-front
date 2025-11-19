@@ -1,11 +1,17 @@
+const rawBasePath = process.env.NEXT_PUBLIC_BASE_PATH || ''
+const normalizedBasePath = rawBasePath
+  ? `/${rawBasePath.replace(/^\/+|\/+$/g, '')}`
+  : ''
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  // Only use basePath in production, not in development
-  ...(process.env.NODE_ENV === 'production' ? {
-    basePath: '/app',
-    assetPrefix: '/app',
-  } : {}),
+  ...(normalizedBasePath
+    ? {
+        basePath: normalizedBasePath,
+        assetPrefix: normalizedBasePath,
+      }
+    : {}),
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -20,7 +26,7 @@ const nextConfig = {
         protocol: 'http',
         hostname: 'localhost',
         port: '3000',
-        pathname: '/app/**',
+        pathname: `${normalizedBasePath || ''}/**`,
       },
     ],
   },

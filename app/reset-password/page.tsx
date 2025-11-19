@@ -7,9 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Mail, Lock, Key } from "lucide-react"
-
-// Helper function for asset paths
-const assetPath = (path: string) => `/app${path.startsWith('/') ? path : `/${path}`}`;
+import { getAssetPath, withBasePath } from "@/lib/utils"
 
 function ResetPasswordForm() {
   const [email, setEmail] = useState("")
@@ -83,7 +81,7 @@ function ResetPasswordForm() {
 
       // Redirect to login after success
       setTimeout(() => {
-        router.push("/login")
+        router.push(withBasePath("/login"))
       }, 3000)
     } catch (err: any) {
       setError(err.message || "Failed to reset password")
@@ -97,7 +95,7 @@ function ResetPasswordForm() {
       {/* Background Image */}
       <div 
         className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: `url("${assetPath("/african-man-harvesting-vegetables 1.png")}")` }}
+        style={{ backgroundImage: `url("${getAssetPath("/african-man-harvesting-vegetables 1.png")}")` }}
       />
       
       {/* Overlay */}
@@ -111,7 +109,7 @@ function ResetPasswordForm() {
             <div className="flex flex-col items-center space-y-2">
               <div className="h-20 w-40 relative">
                 <Image
-                  src={assetPath("/Sponsor.png")}
+                  src={getAssetPath("/Sponsor.png")}
                   alt="FieldEyes Logo"
                   fill
                   sizes="(max-width: 768px) 100vw, 160px"

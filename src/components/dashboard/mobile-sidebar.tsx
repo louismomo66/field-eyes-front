@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Menu, X, Home, Users, Map, PieChart, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { getAssetPath } from "@/lib/utils"
 
 interface MobileSidebarProps {
   currentPath: string
@@ -13,7 +14,7 @@ interface MobileSidebarProps {
 export function MobileSidebar({ currentPath }: MobileSidebarProps) {
   const [open, setOpen] = useState(false)
 
-  const assetPath = (path: string) => `/app${path.startsWith('/') ? path : `/${path}`}`;
+  const assetPath = getAssetPath
 
   const routes = [
     {

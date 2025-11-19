@@ -1,13 +1,13 @@
 import Link from "next/link"
 import { Home, Users, Map, PieChart, Settings } from "lucide-react"
-import { usePathname } from "next/navigation"
+import { getAssetPath } from "@/lib/utils"
 
 interface SidebarProps {
   currentPath: string
 }
 
 export function Sidebar({ currentPath }: SidebarProps) {
-  const assetPath = (path: string) => `/app${path.startsWith('/') ? path : `/${path}`}`;
+  const assetPath = getAssetPath
   
   const routes = [
     {

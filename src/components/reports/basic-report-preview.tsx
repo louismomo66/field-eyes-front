@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Image from "next/image"
 import type { BasicSoilAnalysisReport } from "@/types"
+import { getAssetPath } from "@/lib/utils"
 
 interface BasicReportPreviewProps {
   reportData: BasicSoilAnalysisReport | null;
@@ -41,7 +42,7 @@ export function BasicReportPreview({ reportData, type }: BasicReportPreviewProps
         <div className="flex justify-between items-center mb-4">
           <div className="h-16 w-32 relative">
             <Image
-              src={`${process.env.NEXT_PUBLIC_BASE_PATH || '/app'}/logo.png`}
+              src={getAssetPath("/logo.png")}
               alt="FieldEyes Logo"
               fill
               unoptimized

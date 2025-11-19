@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Sidebar } from "@/components/dashboard/sidebar"
 import { MobileSidebar } from "@/components/dashboard/mobile-sidebar"
 import { getDevice } from "@/lib/api"
+import { withBasePath } from "@/lib/utils"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,7 +30,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (typeof window !== "undefined") {
       localStorage.removeItem("token")
     }
-    router.push("/app/login")
+    router.push(withBasePath("/login"))
   }
   
   // Global error handler for unauthorized errors

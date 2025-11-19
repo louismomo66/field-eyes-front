@@ -4,9 +4,9 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/s
 import { Button } from "@/components/ui/button";
 import { Home, Cpu, FileText, Settings, Menu, X, LogOut, Shield } from "lucide-react";
 import { isAdmin } from "@/lib/client-auth";
+import { getAssetPath, withBasePath } from "@/lib/utils";
 
-// Helper function for asset paths
-const assetPath = (path: string) => `/app${path.startsWith('/') ? path : `/${path}`}`;
+const assetPath = getAssetPath;
 
 interface MobileSidebarProps {
   currentPath: string;
@@ -145,7 +145,7 @@ export function MobileSidebar({ currentPath, className }: MobileSidebarProps) {
           <button 
             onClick={() => {
               localStorage.removeItem("token");
-              window.location.href = "/app/login";
+              window.location.href = withBasePath("/login");
             }}
             className="w-full flex items-center justify-center gap-3 rounded-lg px-4 py-3 text-base font-medium text-gray-200 hover:bg-white/10 transition-all duration-200"
             style={{

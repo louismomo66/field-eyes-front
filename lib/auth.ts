@@ -1,5 +1,7 @@
 "use client"
 
+import { withBasePath } from "@/lib/utils"
+
 // Token management utilities
 const TOKEN_KEY = 'token'
 const COOKIE_MAX_AGE = 30 * 24 * 60 * 60 // 30 days in seconds
@@ -83,5 +85,5 @@ export const handleTokenExpiration = (): void => {
   removeToken()
   
   // Redirect to login page
-  window.location.href = 'https://field-eyes.com/app/login'
-} 
+  window.location.href = withBasePath("/login")
+}
