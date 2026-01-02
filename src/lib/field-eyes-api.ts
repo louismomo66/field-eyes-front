@@ -53,7 +53,9 @@ export class APIError extends Error {
 // Helper function for API requests
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
   try {
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    const fullUrl = `${API_URL}${endpoint}`;
+    console.log(`[DEBUG] Fetching: ${fullUrl}`);
+    const response = await fetch(fullUrl, {
       headers: {
         ...getAuthHeaders(),
       },
