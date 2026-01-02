@@ -60,13 +60,11 @@ function ResetPasswordForm() {
 
     try {
       setLoading(true)
-      let API_URL = process.env.NEXT_PUBLIC_API_URL || 
-        (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
-          ? '/api' 
-          : "http://localhost:9002/api")
-      // Normalize: if API URL points to api.field-eyes.com, use relative path instead
-      if (typeof window !== 'undefined' && API_URL.includes('api.field-eyes.com')) {
-        API_URL = '/api'
+      // HARDCODED CONFIGURATION TO FIX DOMAIN MISMATCH
+      let API_URL = "https://field-eyes-api.field-eyes.com/api";
+
+      if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+        API_URL = "http://localhost:9002/api";
       }
       const response = await fetch(`${API_URL}/reset-password`, {
         method: "POST",
@@ -100,11 +98,11 @@ function ResetPasswordForm() {
   return (
     <div className="relative min-h-screen w-full">
       {/* Background Image */}
-      <div 
+      <div
         className="absolute inset-0 bg-cover bg-center"
         style={{ backgroundImage: `url("${getAssetPath("/african-man-harvesting-vegetables 1.png")}")` }}
       />
-      
+
       {/* Overlay */}
       <div className="absolute inset-0 bg-[#052816] bg-opacity-70" />
 

@@ -7,14 +7,17 @@ import { isAdmin } from "@/lib/client-auth"
 // Use relative path in production (nginx proxies /api/ to backend)
 // Use localhost in development
 // If env var points to api.field-eyes.com (invalid cert), use relative path instead
-let API_URL = process.env.NEXT_PUBLIC_API_URL || 
-  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
-    ? '/api' 
-    : "http://localhost:9002/api")
+// HARDCODED CONFIGURATION TO FIX DOMAIN MISMATCH
+// We strictly force the production URL unless we are on localhost.
+let API_URL = "https://field-eyes-api.field-eyes.com/api";
 
-// Normalize: if API URL points to api.field-eyes.com, use relative path instead
-if (typeof window !== 'undefined' && API_URL.includes('api.field-eyes.com')) {
-  API_URL = '/api'
+if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+  API_URL = "http://localhost:9002/api";
+}
+
+// Debugging log
+if (typeof window !== 'undefined') {
+  console.log("src/lib/api.ts using API_URL:", API_URL);
 }
 
 // Helper function for API requests
@@ -50,19 +53,19 @@ export async function getDevices(): Promise<Device[]> {
 export async function getDevice(id: string): Promise<Device> {
   // Get all devices
   const devices = await getDevices();
-  
+
   // Try to find a matching device
-  const device = devices.find(d => 
+  const device = devices.find(d =>
     // Match by serial number
-    d.serial_number === id || 
+    d.serial_number === id ||
     // Match by ID (string comparison)
     String(d.id) === id
   );
-  
+
   if (!device) {
     throw new Error(`Device with ID or serial number ${id} not found`);
   }
-  
+
   return device;
 }
 
@@ -118,7 +121,7 @@ export async function generateReport(
         console.error("Error checking admin status:", error);
       }
     }
-    
+
     // Get device logs for CSV format
     if (options.format === "csv") {
       console.log("Fetching device logs for CSV export:", deviceId, options.startDate, options.endDate, "Admin:", userIsAdmin);
@@ -127,11 +130,11 @@ export async function generateReport(
         start_date: options.startDate,
         end_date: options.endDate
       }).toString();
-      
+
       // Use admin endpoint if user is admin, otherwise use regular endpoint
       const endpoint = userIsAdmin ? `/admin/device-logs?${queryParams}` : `/get-device-logs?${queryParams}`;
       const logs = await fetchAPI<any[]>(endpoint);
-      
+
       console.log("Received logs for CSV:", logs);
       return {
         device_name: deviceId,
@@ -167,7 +170,7 @@ export async function generateReport(
     if (reportType === "comprehensive") {
       return transformToComprehensiveReport(basicAnalysisData);
     }
-    
+
     // For other report types, use the existing API
     return fetchAPI<ReportData>("/reports/generate", {
       method: "POST",
@@ -192,7 +195,7 @@ function transformToComprehensiveReport(basicData: any): ReportData {
     month: 'long',
     day: 'numeric'
   });
-  
+
   // Transform basic soil parameters to soil indicators format
   const soilIndicators = basicData.parameters.map((param: any) => ({
     name: param.name,
@@ -201,28 +204,28 @@ function transformToComprehensiveReport(basicData: any): ReportData {
     ideal: `${param.ideal_min} - ${param.ideal_max} ${param.unit}`,
     explanation: getParameterExplanation(param.name, param.rating)
   }));
-  
+
   // Generate key findings based on parameters
   const keyFindings = basicData.parameters
-    .filter((param: any) => 
-      param.rating !== "Optimum" && 
+    .filter((param: any) =>
+      param.rating !== "Optimum" &&
       ["pH", "Nitrogen", "Phosphorous", "Potassium", "Electrical Conductivity"].includes(param.name))
     .map((param: any) => getKeyFinding(param.name, param.rating, param.average));
-  
+
   // Add a general soil health finding if we have pH and NPK data
-  const hasSoilHealthData = basicData.parameters.some((p: any) => p.name === "pH") && 
-                          basicData.parameters.some((p: any) => p.name === "Nitrogen");
-                          
+  const hasSoilHealthData = basicData.parameters.some((p: any) => p.name === "pH") &&
+    basicData.parameters.some((p: any) => p.name === "Nitrogen");
+
   if (hasSoilHealthData) {
     keyFindings.unshift(`Overall soil health assessment indicates ${getOverallRating(basicData.parameters)} conditions.`);
   }
-  
+
   // Generate crop recommendations based on soil parameters
   const cropRecommendations = generateDefaultCropRecommendations(basicData.parameters);
-  
+
   // Generate treatment recommendations based on soil parameters
   const treatmentRecommendations = generateTreatmentRecommendations(basicData.parameters);
-  
+
   // Compile the comprehensive report
   return {
     date: currentDate,
@@ -287,44 +290,44 @@ function getParameterExplanation(name: string, rating: string): string {
   };
 
   // Return the specific explanation or a default one
-  return explanations[name]?.[rating] || 
+  return explanations[name]?.[rating] ||
     `${name} is ${rating.toLowerCase()}, which may affect plant growth and soil health.`;
 }
 
 function getKeyFinding(name: string, rating: string, value: number): string {
-  switch(name) {
+  switch (name) {
     case "pH":
-      if (rating === "Very Low") 
+      if (rating === "Very Low")
         return `Soil pH is extremely acidic at ${value.toFixed(1)}, requiring significant liming to correct.`;
-      if (rating === "Low") 
+      if (rating === "Low")
         return `Acidic soil (pH ${value.toFixed(1)}) may limit nutrient availability for many crops.`;
-      if (rating === "High") 
+      if (rating === "High")
         return `Alkaline soil (pH ${value.toFixed(1)}) may reduce micronutrient availability.`;
-      if (rating === "Very High") 
+      if (rating === "Very High")
         return `Extremely alkaline soil (pH ${value.toFixed(1)}) requires acidification for most crops.`;
       break;
     case "Nitrogen":
-      if (rating === "Very Low" || rating === "Low") 
+      if (rating === "Very Low" || rating === "Low")
         return `Nitrogen deficiency detected, supplemental fertilization recommended.`;
-      if (rating === "High" || rating === "Very High") 
+      if (rating === "High" || rating === "Very High")
         return `Elevated nitrogen levels may cause excessive vegetative growth.`;
       break;
     case "Phosphorous":
-      if (rating === "Very Low" || rating === "Low") 
+      if (rating === "Very Low" || rating === "Low")
         return `Low phosphorus may limit root development and flowering.`;
-      if (rating === "High" || rating === "Very High") 
+      if (rating === "High" || rating === "Very High")
         return `High phosphorus levels may impact water quality and create nutrient imbalances.`;
       break;
     case "Potassium":
-      if (rating === "Very Low" || rating === "Low") 
+      if (rating === "Very Low" || rating === "Low")
         return `Potassium deficiency may reduce crop resistance to drought and disease.`;
-      if (rating === "High" || rating === "Very High") 
+      if (rating === "High" || rating === "Very High")
         return `Excessive potassium may interfere with calcium and magnesium uptake.`;
       break;
     case "Electrical Conductivity":
-      if (rating === "Very Low") 
+      if (rating === "Very Low")
         return `Very low salt content may indicate nutrient leaching or poor fertility.`;
-      if (rating === "High" || rating === "Very High") 
+      if (rating === "High" || rating === "Very High")
         return `Elevated salt content may stress plants and affect water uptake.`;
       break;
   }
@@ -341,14 +344,14 @@ function getOverallRating(parameters: any[]): string {
     "High": ratings.filter(r => r === "High").length,
     "Very High": ratings.filter(r => r === "Very High").length
   };
-  
+
   // Weight by importance (pH, NPK more important than others)
   const importantParams = ["pH", "Nitrogen", "Phosphorous", "Potassium"];
   const importantRatings = parameters
     .filter(p => importantParams.includes(p.name))
     .map(p => p.rating);
-  
-  if (importantRatings.includes("Very Low") || counts["Very Low"] > 2) 
+
+  if (importantRatings.includes("Very Low") || counts["Very Low"] > 2)
     return "Poor";
   if (importantRatings.includes("Low") || counts["Low"] > 1)
     return "Fair";
@@ -356,7 +359,7 @@ function getOverallRating(parameters: any[]): string {
     return "Good";
   if (counts["Optimum"] >= parameters.length * 0.75)
     return "Excellent";
-  
+
   return "Fair";
 }
 
@@ -364,12 +367,12 @@ function generateDefaultCropRecommendations(parameters: any[]): any[] {
   // Get soil pH to determine crop suitability
   const pHParam = parameters.find(p => p.name === "pH");
   const pH = pHParam ? pHParam.average : 7.0; // Default to neutral if not found
-  
+
   // Get NPK levels for crop selection
   const nitrogen = parameters.find(p => p.name === "Nitrogen")?.average || 20;
   const phosphorus = parameters.find(p => p.name === "Phosphorous")?.average || 20;
   const potassium = parameters.find(p => p.name === "Potassium")?.average || 150;
-  
+
   // Example set of crops with different requirements
   const crops = [
     {
@@ -397,7 +400,7 @@ function generateDefaultCropRecommendations(parameters: any[]): any[] {
       roi: "90-110%"
     }
   ];
-  
+
   // Add a vegetable crop option if the soil is suitable
   if (pH > 6.0 && pH < 7.0 && nitrogen > 20) {
     crops.push({
@@ -409,19 +412,19 @@ function generateDefaultCropRecommendations(parameters: any[]): any[] {
       roi: "200-300%"
     });
   }
-  
+
   return crops;
 }
 
 function generateTreatmentRecommendations(parameters: any[]): any[] {
   const treatments = [];
-  
+
   // Get soil parameters for treatment decisions
   const pH = parameters.find(p => p.name === "pH")?.average || 7.0;
   const nitrogen = parameters.find(p => p.name === "Nitrogen")?.average || 20;
   const phosphorus = parameters.find(p => p.name === "Phosphorous")?.average || 20;
   const potassium = parameters.find(p => p.name === "Potassium")?.average || 150;
-  
+
   // Add pH correction if needed
   if (pH < 6.0) {
     treatments.push({
@@ -442,7 +445,7 @@ function generateTreatmentRecommendations(parameters: any[]): any[] {
       roi: "100-130% through improved yield"
     });
   }
-  
+
   // Add nitrogen fertilization if needed
   if (nitrogen < 20) {
     treatments.push({
@@ -454,7 +457,7 @@ function generateTreatmentRecommendations(parameters: any[]): any[] {
       roi: "150-200% through increased yield"
     });
   }
-  
+
   // Add phosphorus fertilization if needed
   if (phosphorus < 20) {
     treatments.push({
@@ -466,7 +469,7 @@ function generateTreatmentRecommendations(parameters: any[]): any[] {
       roi: "130-180% through improved yield"
     });
   }
-  
+
   // Add potassium fertilization if needed
   if (potassium < 150) {
     treatments.push({
@@ -478,7 +481,7 @@ function generateTreatmentRecommendations(parameters: any[]): any[] {
       roi: "120-160% through reduced crop loss"
     });
   }
-  
+
   // If no specific treatments needed, add a general recommendation
   if (treatments.length === 0) {
     treatments.push({
@@ -490,7 +493,7 @@ function generateTreatmentRecommendations(parameters: any[]): any[] {
       roi: "120-150% through long-term soil health improvement"
     });
   }
-  
+
   return treatments;
 }
 
@@ -498,10 +501,10 @@ function generateTreatmentRecommendations(parameters: any[]): any[] {
 export async function getNotifications(deviceId?: string | number): Promise<Notification[]> {
   // If deviceId is provided, ensure it's sent as is (whether number or string)
   // This allows filtering by both ID and serial number on the backend
-  const endpoint = deviceId 
+  const endpoint = deviceId
     ? `/notifications?device_id=${deviceId}`
     : "/notifications"
-    
+
   try {
     console.log(`Fetching notifications from: ${endpoint}`);
     const token = getToken();
@@ -511,14 +514,14 @@ export async function getNotifications(deviceId?: string | number): Promise<Noti
         "Authorization": token ? `Bearer ${token}` : "",
       }
     });
-    
+
     if (!rawResponse.ok) {
       throw new Error(`API error: ${rawResponse.status} ${rawResponse.statusText}`);
     }
-    
+
     const response = await rawResponse.json();
     console.log('Raw notifications API response:', response);
-    
+
     // Field Eyes backend returns a specific format: { notifications: [...], count: number }
     if (response && response.notifications && Array.isArray(response.notifications)) {
       console.log(`Found ${response.notifications.length} notifications in response`);
@@ -543,13 +546,13 @@ export async function generateDeviceNotifications(serialNumber: string): Promise
 
   try {
     console.log(`Generating notifications for device with serial number: ${serialNumber}`);
-    
+
     // Call the endpoint to generate notifications for this specific device
     const endpoint = `/devices/notifications?serial_number=${serialNumber}`;
     const response = await fetchAPI<{ message: string; status: string }>(endpoint, {
       method: "GET",
     });
-    
+
     console.log('Generate notifications response:', response);
     return response;
   } catch (error) {
@@ -567,11 +570,11 @@ export async function markNotificationAsRead(id: string): Promise<void> {
 export async function clearAllNotifications(): Promise<void> {
   try {
     console.log('Clearing all notifications');
-    
+
     // Use the dedicated endpoint to delete all notifications
     const token = getToken();
     const url = `${API_URL}/notifications/delete-all`;
-    
+
     console.log(`Deleting all notifications via: ${url}`);
     const response = await fetch(url, {
       method: "DELETE",
@@ -580,14 +583,14 @@ export async function clearAllNotifications(): Promise<void> {
         "Authorization": token ? `Bearer ${token}` : "",
       }
     });
-    
+
     if (!response.ok) {
       throw new Error(`API error: ${response.status} ${response.statusText}`);
     }
-    
+
     const data = await response.json();
     console.log('Delete all notifications response:', data);
-    
+
     if (data && data.message) {
       console.log(data.message);
     }
@@ -602,12 +605,12 @@ export async function getNotificationsBySerialNumber(serialNumber: string): Prom
     console.error('No serial number provided');
     return [];
   }
-  
+
   try {
     // Use device_name instead of device_id to explicitly query by serial number
     const endpoint = `/notifications?device_name=${serialNumber}`;
     console.log(`Fetching notifications using device name endpoint: ${endpoint}`);
-    
+
     const token = getToken();
     const rawResponse = await fetch(`${API_URL}${endpoint}`, {
       headers: {
@@ -615,14 +618,14 @@ export async function getNotificationsBySerialNumber(serialNumber: string): Prom
         "Authorization": token ? `Bearer ${token}` : "",
       }
     });
-    
+
     if (!rawResponse.ok) {
       throw new Error(`API error: ${rawResponse.status} ${rawResponse.statusText}`);
     }
-    
+
     const response = await rawResponse.json();
     console.log('Raw serial number notifications response:', response);
-    
+
     // Field Eyes backend returns a specific format: { notifications: [...], count: number }
     if (response && response.notifications && Array.isArray(response.notifications)) {
       console.log(`Found ${response.notifications.length} notifications in response for serial ${serialNumber}`);

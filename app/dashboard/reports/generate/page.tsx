@@ -48,7 +48,7 @@ export default function GenerateReportPage() {
       try {
         setIsLoading(true)
         setError(null)
-        
+
         // Check if user is admin
         let userIsAdmin = false
         if (typeof window !== 'undefined') {
@@ -59,9 +59,9 @@ export default function GenerateReportPage() {
             console.error("Error checking admin status:", error)
           }
         }
-        
+
         console.log("Fetching devices... User is admin:", userIsAdmin)
-        
+
         // Fetch devices based on user role
         let data
         if (userIsAdmin) {
@@ -71,13 +71,13 @@ export default function GenerateReportPage() {
           console.log("Fetching user devices...")
           data = await getUserDevices()
         }
-        
+
         console.log("Devices received:", data)
-        
+
         // Transform devices using the helper function
         const transformedDevices = transformDevices(data)
         console.log("Transformed devices:", transformedDevices)
-        
+
         // Convert to the expected Device type from @/types and ensure IDs are strings
         const typedDevices = transformedDevices
           .filter((device: any) => device && (device.id || device.serial_number))
@@ -89,7 +89,7 @@ export default function GenerateReportPage() {
             lng: device.lng || 0,
             readings: device.readings || {}
           } as Device))
-        
+
         setDevices(typedDevices)
         setIsLoading(false)
       } catch (err) {
@@ -137,7 +137,7 @@ export default function GenerateReportPage() {
     // Convert to string for consistent comparison
     const idToToggle = String(deviceId);
     console.log("Selecting device:", idToToggle);
-    
+
     setSelectedDevices(prev => {
       const isSelected = prev.includes(idToToggle);
       if (isSelected) {
@@ -197,7 +197,7 @@ export default function GenerateReportPage() {
           options
         );
         console.log("CSV data received:", data);
-        
+
         // Convert the data to CSV format
         const csvData = convertDeviceLogsToCsv((data as BasicSoilAnalysisReport).parameters, (data as BasicSoilAnalysisReport).device_name);
         setCsvData(csvData);
@@ -210,13 +210,11 @@ export default function GenerateReportPage() {
 
         try {
           // Use the field-eyes-api utility function
-          let apiUrl = process.env.NEXT_PUBLIC_API_URL || 
-            (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
-              ? '/api' 
-              : 'http://localhost:9002/api')
-          // Normalize: if API URL points to api.field-eyes.com, use relative path instead
-          if (typeof window !== 'undefined' && apiUrl.includes('api.field-eyes.com')) {
-            apiUrl = '/api'
+          // HARDCODED CONFIGURATION TO FIX DOMAIN MISMATCH
+          let apiUrl = "https://field-eyes-api.field-eyes.com/api";
+
+          if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+            apiUrl = "http://localhost:9002/api";
           }
           const response = await fetch(`${apiUrl}/reports/basic-soil-analysis`, {
             method: "POST",
@@ -255,7 +253,7 @@ export default function GenerateReportPage() {
               throw new Error(errorData.message || "Failed to generate report");
             }
           }
-          
+
           data = await response.json();
           if (!data) {
             throw new Error("No report data received");
@@ -296,7 +294,7 @@ export default function GenerateReportPage() {
       const csvData = [
         ["Parameter", "Unit", "Ideal Min", "Ideal Max", "Average", "Min", "Max", "Rating", "CEC (if applicable)"]
       ];
-      
+
       // Data rows for basic soil analysis
       data.parameters.forEach((param: any) => {
         csvData.push([
@@ -311,17 +309,17 @@ export default function GenerateReportPage() {
           param.cec || ""
         ]);
       });
-      
+
       return csvData;
     }
-    
+
     // If data contains parameters array with raw logs, it's a device logs export
     if (data.parameters && Array.isArray(data.parameters)) {
       const logs = data.parameters;
       if (logs.length === 0) {
         return [["No data available for the selected period"]];
       }
-      
+
       // Get all possible fields from the logs
       const fields = new Set<string>();
       logs.forEach((log: any) => {
@@ -331,22 +329,22 @@ export default function GenerateReportPage() {
           }
         });
       });
-      
+
       // Create headers
-      const headers = Array.from(fields).map(field => 
+      const headers = Array.from(fields).map(field =>
         field.split('_')
           .map(word => word.charAt(0).toUpperCase() + word.slice(1))
           .join(' ')
       );
-      
+
       // Create CSV data with headers
       const csvData = [headers];
-      
+
       // Add data rows
       logs.forEach((log: any) => {
         const row = Array.from(fields).map(field => {
           const value = log[field];
-          
+
           // Format dates
           if ((field === 'created_at' || field === 'timestamp') && value) {
             try {
@@ -355,21 +353,21 @@ export default function GenerateReportPage() {
               return value;
             }
           }
-          
+
           // Format numbers
           if (typeof value === 'number') {
             return value.toFixed(field === 'electrical_conductivity' ? 4 : 2);
           }
-          
+
           return value !== undefined && value !== null ? value : '';
         });
-        
+
         csvData.push(row);
       });
-      
+
       return csvData;
     }
-    
+
     return [["No data available"]];
   }
 
@@ -392,8 +390,7 @@ export default function GenerateReportPage() {
 
       link.setAttribute(
         "download",
-        `soil_data_${deviceName}_${startDate ? formatDate(startDate, "yyyy-MM-dd") : ""}_to_${
-          endDate ? formatDate(endDate, "yyyy-MM-dd") : ""
+        `soil_data_${deviceName}_${startDate ? formatDate(startDate, "yyyy-MM-dd") : ""}_to_${endDate ? formatDate(endDate, "yyyy-MM-dd") : ""
         }.csv`,
       )
       document.body.appendChild(link)
@@ -425,8 +422,8 @@ export default function GenerateReportPage() {
   }
 
   // Filter devices based on search term
-  const filteredDevices = devices.filter(device => 
-    !deviceSearch || 
+  const filteredDevices = devices.filter(device =>
+    !deviceSearch ||
     (device.name && device.name.toLowerCase().includes(deviceSearch.toLowerCase())) ||
     String(device.id).includes(deviceSearch)
   )
@@ -436,13 +433,13 @@ export default function GenerateReportPage() {
     if (!logs || logs.length === 0) {
       return [["No data available for the selected device and date range"]];
     }
-    
+
     console.log(`Converting ${logs.length} logs to CSV for device ${deviceName}`);
-    
+
     // Fields to exclude from the CSV export
     const excludedFields = [
-      'updated_at', 
-      'deleted_at', 
+      'updated_at',
+      'deleted_at',
       'device_id',
       'UpdatedAt',
       'DeletedAt',
@@ -451,21 +448,21 @@ export default function GenerateReportPage() {
       'ID',
       '_id'
     ];
-    
+
     // Create a comprehensive set of all fields present in any log
     const allFields = new Set<string>();
     logs.forEach(log => {
       Object.keys(log).forEach(key => {
         // Skip internal fields, function fields, and excluded fields
-        if (!key.startsWith('_') && 
-            typeof log[key] !== 'function' && 
-            !excludedFields.includes(key) &&
-            !excludedFields.includes(key.toLowerCase())) {
+        if (!key.startsWith('_') &&
+          typeof log[key] !== 'function' &&
+          !excludedFields.includes(key) &&
+          !excludedFields.includes(key.toLowerCase())) {
           allFields.add(key);
         }
       });
     });
-    
+
     // Prioritize important fields in a specific order
     const priorityFields = [
       'timestamp',               // Timestamp field
@@ -487,13 +484,13 @@ export default function GenerateReportPage() {
       'longitude',               // GPS coordinates
       'latitude',                // GPS coordinates
     ];
-    
+
     // Filter out excluded fields and create ordered field list
-    const filteredFields = Array.from(allFields).filter(field => 
-      !excludedFields.includes(field) && 
+    const filteredFields = Array.from(allFields).filter(field =>
+      !excludedFields.includes(field) &&
       !excludedFields.includes(field.toLowerCase())
     );
-    
+
     // Find timestamp field - prioritize 'timestamp', then 'created_at', then 'CreatedAt'
     let timestampField = null;
     if (filteredFields.includes('timestamp')) {
@@ -503,26 +500,26 @@ export default function GenerateReportPage() {
     } else if (filteredFields.includes('CreatedAt')) {
       timestampField = 'CreatedAt';
     }
-    
+
     // Create ordered field list with timestamp first if available
     let orderedFields = [];
-    
+
     // Add timestamp first if available
     if (timestampField) {
       orderedFields.push(timestampField);
     }
-    
+
     // Add remaining fields in priority order
     orderedFields = [
       ...orderedFields,
-      ...priorityFields.filter(field => 
+      ...priorityFields.filter(field =>
         filteredFields.includes(field) && field !== timestampField
       ),
-      ...filteredFields.filter(field => 
+      ...filteredFields.filter(field =>
         !priorityFields.includes(field) && field !== timestampField
       )
     ];
-    
+
     // Create header row with nicely formatted field names
     const headers = orderedFields.map(field => {
       // Format field names for readability (capitalize, replace underscores with spaces)
@@ -531,15 +528,15 @@ export default function GenerateReportPage() {
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
     });
-    
+
     // Create CSV data with header row first
     const csvData = [headers];
-    
+
     // Add all log entries as rows
     logs.forEach(log => {
       const row = orderedFields.map(field => {
         const value = log[field];
-        
+
         // Format dates
         if ((field === 'timestamp' || field === 'created_at' || field === 'CreatedAt') && value) {
           try {
@@ -548,7 +545,7 @@ export default function GenerateReportPage() {
             return value;
           }
         }
-        
+
         // Format numbers (except EC which should remain raw)
         if (typeof value === 'number') {
           // Keep EC values as raw numbers without formatting
@@ -558,14 +555,14 @@ export default function GenerateReportPage() {
           // Use 2 decimal places for other numerical values
           return value.toFixed(2);
         }
-        
+
         // Return value or empty string if null/undefined
         return value !== undefined && value !== null ? value : '';
       });
-      
+
       csvData.push(row);
     });
-    
+
     console.log(`CSV report prepared with ${csvData.length} rows (including header)`);
     return csvData;
   }
@@ -606,7 +603,7 @@ export default function GenerateReportPage() {
             <CardContent className="space-y-6">
               <div className="space-y-4">
                 <Label className="text-base font-medium">Select Device</Label>
-                
+
                 {isLoading ? (
                   <div className="flex items-center space-x-2 py-2">
                     <div className="animate-spin h-4 w-4 border-2 border-green-600 rounded-full border-t-transparent"></div>
@@ -621,15 +618,15 @@ export default function GenerateReportPage() {
                     {/* Device selection dropdown */}
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           className="w-full justify-between border-input"
                           disabled={devices.length === 0}
                         >
                           <span className="truncate">
                             {selectedDevices.length > 0 ? (
                               <span className="flex items-center gap-2">
-                                {selectedDevices.length === 1 
+                                {selectedDevices.length === 1
                                   ? devices.find(d => String(d.id) === selectedDevices[0])?.name || `Device ${selectedDevices[0]}`
                                   : `${selectedDevices.length} devices selected`}
                               </span>
@@ -644,15 +641,15 @@ export default function GenerateReportPage() {
                         <div className="p-2 border-b">
                           <div className="flex items-center gap-2">
                             <Search className="h-4 w-4 opacity-50" />
-                            <Input 
-                              placeholder="Search devices..." 
+                            <Input
+                              placeholder="Search devices..."
                               className="h-8 border-0 focus-visible:ring-0"
                               value={deviceSearch}
                               onChange={(e) => setDeviceSearch(e.target.value)}
                             />
                           </div>
                         </div>
-                        
+
                         <div className="max-h-[300px] overflow-auto p-1">
                           {filteredDevices.length === 0 ? (
                             <div className="p-3 text-center text-sm text-muted-foreground">
@@ -665,13 +662,12 @@ export default function GenerateReportPage() {
                                 .map((device) => {
                                   const deviceId = String(device.id);
                                   const isSelected = selectedDevices.includes(deviceId);
-                                  
+
                                   return (
-                                    <div 
+                                    <div
                                       key={deviceId} // Ensure key is always a string and defined
-                                      className={`w-full text-left flex items-center p-2 rounded cursor-pointer hover:bg-muted ${
-                                        isSelected ? 'bg-green-50 text-green-700 dark:bg-green-900/20' : ''
-                                      }`}
+                                      className={`w-full text-left flex items-center p-2 rounded cursor-pointer hover:bg-muted ${isSelected ? 'bg-green-50 text-green-700 dark:bg-green-900/20' : ''
+                                        }`}
                                       onClick={() => handleDeviceChange(deviceId)}
                                     >
                                       <div className="mr-2 flex-shrink-0 w-5 h-5 border rounded flex items-center justify-center
@@ -693,12 +689,12 @@ export default function GenerateReportPage() {
                     </Popover>
                   </div>
                 )}
-                
+
                 <p className="text-sm text-muted-foreground mt-2">
                   {isLoading ? "Retrieving your devices..." :
-                   selectedDevices.length === 0
-                    ? `Select a device to generate a report${isAdminUser ? ` (${devices.length} total devices available)` : ''}`
-                    : `Report will focus on data from the selected devices`}
+                    selectedDevices.length === 0
+                      ? `Select a device to generate a report${isAdminUser ? ` (${devices.length} total devices available)` : ''}`
+                      : `Report will focus on data from the selected devices`}
                 </p>
                 {isAdminUser && (
                   <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
@@ -712,21 +708,21 @@ export default function GenerateReportPage() {
               <div className="space-y-4">
                 <Label className="text-base font-medium">Time Period</Label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
+                  <div className="space-y-2">
                     <Label htmlFor="date-range">Preset Ranges</Label>
                     <Select value={dateRange} onValueChange={setDateRange}>
                       <SelectTrigger id="date-range">
                         <SelectValue placeholder="Select time range" />
-                    </SelectTrigger>
-                    <SelectContent>
+                      </SelectTrigger>
+                      <SelectContent>
                         <SelectItem value="7days">Last 7 days</SelectItem>
                         <SelectItem value="30days">Last 30 days</SelectItem>
                         <SelectItem value="90days">Last 90 days</SelectItem>
                         <SelectItem value="6months">Last 6 months</SelectItem>
                         <SelectItem value="1year">Last 12 months</SelectItem>
                         <SelectItem value="custom">Custom range</SelectItem>
-                    </SelectContent>
-                  </Select>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {dateRange === "custom" && (
@@ -779,32 +775,32 @@ export default function GenerateReportPage() {
                 <p className="text-sm text-muted-foreground">
                   {startDate && endDate
                     ? `Report will include data from ${formatDate(startDate, "MMMM d, yyyy")} to ${formatDate(
-                        endDate,
-                        "MMMM d, yyyy",
-                      )}`
+                      endDate,
+                      "MMMM d, yyyy",
+                    )}`
                     : "Select a date range for your report"}
-                  </p>
-                </div>
+                </p>
+              </div>
 
-                <div className="space-y-2">
+              <div className="space-y-2">
                 <Label htmlFor="report-format" className="text-base font-medium">
-                    Report Format
-                  </Label>
+                  Report Format
+                </Label>
                 <RadioGroup value={reportFormat} onValueChange={setReportFormat} className="flex gap-4">
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="pdf" id="pdf" />
-                      <Label htmlFor="pdf" className="cursor-pointer">
-                        PDF Report
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="csv" id="csv" />
-                      <Label htmlFor="csv" className="cursor-pointer">
-                        CSV Export
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                  <p className="text-xs text-muted-foreground">
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="pdf" id="pdf" />
+                    <Label htmlFor="pdf" className="cursor-pointer">
+                      PDF Report
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="csv" id="csv" />
+                    <Label htmlFor="csv" className="cursor-pointer">
+                      CSV Export
+                    </Label>
+                  </div>
+                </RadioGroup>
+                <p className="text-xs text-muted-foreground">
                   {reportFormat === "pdf"
                     ? "PDF includes analysis and recommendations based on selected time period"
                     : "CSV includes all raw data for the selected devices and time period"}
@@ -813,50 +809,50 @@ export default function GenerateReportPage() {
 
               {reportFormat === "pdf" && (
                 <>
-                    <div className="space-y-2">
-                      <Label htmlFor="report-type">Report Type</Label>
-                      <RadioGroup
-                        value={reportType}
-                        onValueChange={(value: string) => {
-                          if (value === "comprehensive" || value === "basic" || value === "crop") {
-                            setReportType(value);
-                          }
-                        }}
-                        className="flex flex-col space-y-4"
-                      >
-                        <div className="space-y-2 border rounded-md p-3 hover:bg-gray-50 cursor-pointer">
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="comprehensive" id="comprehensive" />
-                            <Label htmlFor="comprehensive" className="cursor-pointer font-medium">Comprehensive Report</Label>
-                          </div>
-                          <p className="text-sm text-gray-600 ml-6">
-                            Complete soil health analysis with detailed soil parameters, crop recommendations, 
-                            treatment suggestions, and a seasonal management plan based on your device data.
-                          </p>
+                  <div className="space-y-2">
+                    <Label htmlFor="report-type">Report Type</Label>
+                    <RadioGroup
+                      value={reportType}
+                      onValueChange={(value: string) => {
+                        if (value === "comprehensive" || value === "basic" || value === "crop") {
+                          setReportType(value);
+                        }
+                      }}
+                      className="flex flex-col space-y-4"
+                    >
+                      <div className="space-y-2 border rounded-md p-3 hover:bg-gray-50 cursor-pointer">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="comprehensive" id="comprehensive" />
+                          <Label htmlFor="comprehensive" className="cursor-pointer font-medium">Comprehensive Report</Label>
                         </div>
-                        
-                        <div className="space-y-2 border rounded-md p-3 hover:bg-gray-50 cursor-pointer">
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="basic" id="basic" />
-                            <Label htmlFor="basic" className="cursor-pointer font-medium">Basic Soil Analysis</Label>
-                          </div>
-                          <p className="text-sm text-gray-600 ml-6">
-                            Essential soil parameters and ratings with visual indicators
-                            of soil health status for the selected time period.
-                          </p>
+                        <p className="text-sm text-gray-600 ml-6">
+                          Complete soil health analysis with detailed soil parameters, crop recommendations,
+                          treatment suggestions, and a seasonal management plan based on your device data.
+                        </p>
+                      </div>
+
+                      <div className="space-y-2 border rounded-md p-3 hover:bg-gray-50 cursor-pointer">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="basic" id="basic" />
+                          <Label htmlFor="basic" className="cursor-pointer font-medium">Basic Soil Analysis</Label>
                         </div>
-                        
-                        <div className="space-y-2 border rounded-md p-3 hover:bg-gray-50 cursor-pointer">
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="crop" id="crop" />
-                            <Label htmlFor="crop" className="cursor-pointer font-medium">Crop-Specific Report</Label>
-                          </div>
-                          <p className="text-sm text-gray-600 ml-6">
-                            Tailored analysis for specific crops with customized recommendations
-                            based on the crop's unique requirements.
-                          </p>
+                        <p className="text-sm text-gray-600 ml-6">
+                          Essential soil parameters and ratings with visual indicators
+                          of soil health status for the selected time period.
+                        </p>
+                      </div>
+
+                      <div className="space-y-2 border rounded-md p-3 hover:bg-gray-50 cursor-pointer">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="crop" id="crop" />
+                          <Label htmlFor="crop" className="cursor-pointer font-medium">Crop-Specific Report</Label>
                         </div>
-                      </RadioGroup>
+                        <p className="text-sm text-gray-600 ml-6">
+                          Tailored analysis for specific crops with customized recommendations
+                          based on the crop's unique requirements.
+                        </p>
+                      </div>
+                    </RadioGroup>
                   </div>
                 </>
               )}
@@ -944,8 +940,8 @@ export default function GenerateReportPage() {
                 reportType === "basic" ? (
                   <BasicReportPreview reportData={reportData} type="basic" />
                 ) : (
-                  <ReportPreview 
-                    reportData={reportData as any} 
+                  <ReportPreview
+                    reportData={reportData as any}
                     includeTreatment={true}
                     includeSeasonalPlan={true}
                   />

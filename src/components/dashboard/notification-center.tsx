@@ -17,9 +17,9 @@ interface NotificationCenterProps {
   serialNumber?: string;
 }
 
-export function NotificationCenter({ 
-  onNotificationUpdate, 
-  deviceId, 
+export function NotificationCenter({
+  onNotificationUpdate,
+  deviceId,
   deviceName,
   serialNumber
 }: NotificationCenterProps) {
@@ -40,7 +40,7 @@ export function NotificationCenter({
 
       // Log what we're using to fetch notifications
       console.log(`Fetching notifications using: ${serialNumber || deviceId || 'all notifications'}`)
-      
+
       // Decide which API function to use based on available identifiers
       let data;
       if (serialNumber) {
@@ -56,18 +56,18 @@ export function NotificationCenter({
         console.log('Getting all notifications')
         data = await getNotifications()
       }
-      
+
       console.log('Notifications data received:', data)
-      
+
       // Safety check for data structure
       if (data && Array.isArray(data)) {
-      setNotifications(data)
-        
+        setNotifications(data)
+
         // Notify parent component
         if (onNotificationUpdate) {
           onNotificationUpdate(data)
         }
-        
+
         if (data.length === 0) {
           console.log(`No notifications found for ${serialNumber || deviceId || 'user'}`)
         } else {
@@ -77,7 +77,7 @@ export function NotificationCenter({
         console.error('Notifications data is not an array:', data)
         setNotifications([])
       }
-      
+
       setIsLoading(false)
     } catch (err) {
       console.error("Error fetching notifications:", err)
@@ -102,7 +102,7 @@ export function NotificationCenter({
 
       // Call the API to generate notifications for this device
       const response = await generateDeviceNotifications(serialNumber)
-      
+
       toast({
         title: "Success",
         description: response.message || "Notification generation started for this device"
@@ -134,12 +134,12 @@ export function NotificationCenter({
       }
 
       // Update local state
-      const updatedNotifications = Array.isArray(notifications) 
-        ? notifications.map((n) => ({ ...n, read: true })) 
+      const updatedNotifications = Array.isArray(notifications)
+        ? notifications.map((n) => ({ ...n, read: true }))
         : []
-      
+
       setNotifications(updatedNotifications)
-      
+
       // Notify parent component
       if (onNotificationUpdate) {
         onNotificationUpdate(updatedNotifications)
@@ -152,17 +152,17 @@ export function NotificationCenter({
   const handleClearAll = async () => {
     try {
       setIsClearing(true);
-      
+
       await clearAllNotifications();
-      
+
       // Update local state to show empty notifications
       setNotifications([]);
-      
+
       // Notify parent component
       if (onNotificationUpdate) {
         onNotificationUpdate([]);
       }
-      
+
       toast({
         title: "Success",
         description: "All notifications have been cleared",
@@ -199,29 +199,27 @@ export function NotificationCenter({
   const debugFetchNotifications = async () => {
     try {
       setIsLoading(true);
-      
+
       // Log parameters being used
       console.log(`Debug fetch with serial number: ${serialNumber}, device ID: ${deviceId}`);
-      
+
       // Get the direct API URL
       // Use relative path in production (nginx proxies /api/ to backend)
       // Use localhost in development
-      let baseUrl = process.env.NEXT_PUBLIC_API_URL || 
-        (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
-          ? '/api' 
-          : "http://localhost:9002/api");
-      // Normalize: if API URL points to api.field-eyes.com, use relative path instead
-      if (typeof window !== 'undefined' && baseUrl.includes('api.field-eyes.com')) {
-        baseUrl = '/api'
+      // HARDCODED CONFIGURATION TO FIX DOMAIN MISMATCH
+      let baseUrl = "https://field-eyes-api.field-eyes.com/api";
+
+      if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+        baseUrl = "http://localhost:9002/api";
       }
-      const endpoint = serialNumber 
+      const endpoint = serialNumber
         ? `${baseUrl}/notifications?device_name=${serialNumber}`
-        : deviceId 
+        : deviceId
           ? `${baseUrl}/notifications?device_id=${deviceId}`
           : `${baseUrl}/notifications`;
-      
+
       console.log(`Debug fetching from: ${endpoint}`);
-      
+
       // Make a direct fetch to see raw response
       const token = getToken();
       const response = await fetch(endpoint, {
@@ -230,10 +228,10 @@ export function NotificationCenter({
           "Content-Type": "application/json"
         }
       });
-      
+
       const jsonData = await response.json();
       console.log('Debug raw API response:', jsonData);
-      
+
       // Show response in toast
       toast({
         title: "API Response Debug",
@@ -244,13 +242,13 @@ export function NotificationCenter({
         ),
         duration: 10000
       });
-      
+
       setIsLoading(false);
     } catch (err) {
       console.error("Debug fetch error:", err);
       setError("Debug fetch failed");
       setIsLoading(false);
-      
+
       toast({
         title: "Debug Error",
         description: String(err),
@@ -275,8 +273,8 @@ export function NotificationCenter({
     )
   }
 
-  const titleText = deviceId 
-    ? `Notifications for ${deviceName || `Device ${deviceId}`}` 
+  const titleText = deviceId
+    ? `Notifications for ${deviceName || `Device ${deviceId}`}`
     : "Notifications";
 
   return (
@@ -284,10 +282,10 @@ export function NotificationCenter({
       <div className="flex items-center justify-between">
         <h3 className="font-medium">{titleText}</h3>
         <div className="flex space-x-2">
-          <Button 
+          <Button
             variant="ghost"
-            size="sm" 
-            className="text-xs flex items-center gap-1" 
+            size="sm"
+            className="text-xs flex items-center gap-1"
             onClick={handleClearAll}
             disabled={isClearing || notifications.length === 0}
           >
@@ -303,9 +301,9 @@ export function NotificationCenter({
               </React.Fragment>
             )}
           </Button>
-        <Button variant="ghost" size="sm" className="text-xs" onClick={handleMarkAllAsRead}>
-          Mark all as read
-        </Button>
+          <Button variant="ghost" size="sm" className="text-xs" onClick={handleMarkAllAsRead}>
+            Mark all as read
+          </Button>
         </div>
       </div>
       <ScrollArea className="h-[300px]">
@@ -326,7 +324,7 @@ export function NotificationCenter({
                 <div className="flex-1 space-y-1">
                   <p className="text-sm font-medium leading-none">{notification.message}</p>
                   <p className="text-xs text-muted-foreground">
-                    {notification.created_at ? 
+                    {notification.created_at ?
                       new Date(notification.created_at).toLocaleString('en-US', {
                         month: 'short',
                         day: 'numeric',
@@ -334,7 +332,7 @@ export function NotificationCenter({
                         hour: '2-digit',
                         minute: '2-digit',
                         hour12: true
-                      }) : 
+                      }) :
                       notification.time}
                   </p>
                 </div>
