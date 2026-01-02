@@ -11,21 +11,31 @@ import {
 } from "../types/field-eyes"
 import { getToken, setToken, removeToken, handleTokenExpiration } from "@/lib/auth"
 
-// Base API URL from environment variable
 // Base API URL configuration
 // 1. Try environment variable first
 // 2. If localhost, use local backend port 9002
 // 3. Otherwise, use the production backend URL on CapRover
 let API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-if (!API_URL) {
+// Debug what is actually being picked up
+if (typeof window !== 'undefined') {
+  console.log("Configured API_URL:", API_URL);
+}
+
+// If missing, empty, or relative (starts with /), force the correct absolute URL
+if (!API_URL || API_URL.startsWith('/')) {
   if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
     API_URL = "http://localhost:9002/api";
   } else {
     // Production fallback - direct to backend
-    // NOTE: Ensure HTTPS is enabled on field-eyes-api in CapRover to avoid Mixed Content errors
-    API_URL = "https://field-eyes-api.field-eyes.com";
+    // NOTE: We append /api because the backend routes are grouped under /api
+    API_URL = "https://field-eyes-api.field-eyes.com/api";
   }
+}
+
+// Ensure no trailing slash to avoid double slashes (e.g. /api//signup)
+if (API_URL.endsWith('/')) {
+  API_URL = API_URL.slice(0, -1);
 }
 
 
