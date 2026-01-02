@@ -71,7 +71,8 @@ import {
           // Only handle as token expiration if it's explicitly about token issues
           if (errorMessage.includes("invalid or missing token") || 
               errorMessage.includes("token expired") ||
-              errorMessage.includes("unauthorized: invalid or missing token")) {
+              errorMessage.includes("unauthorized: invalid or missing token") ||
+              errorMessage.includes("no token found")) {
             console.log("Token expiration detected, logging out");
             handleTokenExpiration()
             throw new APIError(
