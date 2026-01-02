@@ -28,10 +28,7 @@ if (!API_URL) {
   }
 }
 
-// Normalize: if API URL points to api.field-eyes.com, use relative path instead
-if (typeof window !== 'undefined' && API_URL.includes('api.field-eyes.com')) {
-  API_URL = '/api'
-}
+
 
 // Authentication headers helper
 const getAuthHeaders = () => {
